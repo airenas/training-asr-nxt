@@ -1,15 +1,17 @@
 ############################################################
--include Makefile.options
+-include ../../Makefile.options
 ############################################################
 log?=INFO
-python_cmd=PYTHONPATH=./ LOG_LEVEL=$(log) python
-CUDA?=cuda:0
+python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
+# CUDA?=cuda:0
+CUDA_VISIBLE_DEVICES=
+TF_CPP_MIN_LOG_LEVEL=3
 corpus_dir?=./test
 output_dir?=./.data
 workers?=4
 ############################################################
 install/req:
-	# conda create --name tasr python=3.12
+	# conda create --name tasr python=3.13
 	pip install -r requirements.txt
 
 test/unit:
@@ -25,5 +27,7 @@ $(output_dir):
 	mkdir -p $@
 	
 run: | $(output_dir)
-	$(python_cmd) preparation/run.py --input $(corpus_dir) --output $(output_dir) --workers $(workers)
+	$(python_cmd) local/run.py --input $(corpus_dir) --output $(output_dir) --workers $(workers)
 .PHONY: run	
+
+.EXPORT_ALL_VARIABLES:

@@ -15,3 +15,4 @@ copy/scripts:
 	scp -P $(port) ../../Makefile  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../requirements.txt  $(user)@$(server):~/train-asr/
 	scp -P $(port) -r ./remote/*  $(user)@$(server):~/train-asr/
+	scp -P $(port) -r ../../egs  $(user)@$(server):~/train-asr/
