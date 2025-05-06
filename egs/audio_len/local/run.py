@@ -83,10 +83,11 @@ def main(argv):
     processed_lengths = file_bag.map(audio_length_args)
 
     total_size = calculate_total_sum("size", processed_sizes)
-    logger.info(f"Total size: {total_size / 1024 / 1024} MB")
+    logger.info(f"Total size: {total_size / 1024 / 1024 :.2f} MB")
+    logger.info(f"Total size: {total_size / 1024 / 1024 / 1024 :.2f} GB")
     total_audio_length = calculate_total_sum("audio len", processed_lengths)
-    logger.info(f"Total audio length: {total_audio_length / 60:.2f} in minutes, {total_audio_length / (60*60):.2f} in hours")
-    logger.info(f"Total audio length: {total_audio_length / (60*60):.2f} in hours")
+    logger.info(f"Total audio length: {total_audio_length / 60 :.2f} in minutes")
+    logger.info(f"Total audio length: {total_audio_length / (60 * 60) :.2f} in hours")
 
     client.shutdown()
 

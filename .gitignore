@@ -172,7 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-.data/
+.calc-data/
 test
 .idea/
 **/Makefile.options
