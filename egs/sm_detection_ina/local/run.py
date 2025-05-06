@@ -58,10 +58,13 @@ def calculate_total_smn(file_bag):
             logger.error(f"Error processing {item.get('file_path')}: {item.get('error')}")
             return accum  # Just return current totals unchanged
 
-    # with set(scheduler='synchronous'):  # Remove this block in prod
+    def merge(tot1, tot2):
+        logger.info(f"merge tot1={tot1}, tot2={tot2}")
+        return tuple(a + b for a, b in zip(tot1, tot2))
+
     return file_bag.fold(
         binop=combine_smn,
-        combine=combine_smn,
+        combine=merge,
         initial=(0, 0, 0)
     ).compute()
 
@@ -78,7 +81,7 @@ def main(argv):
     logger.info(f"Output dir: {args.output}")
     logger.info(f"Workers   : {args.workers}")
 
-    cluster = LocalCluster(n_workers=args.workers, threads_per_worker=1)
+    cluster = LocalCluster(n_workers=args.workers, threads_per_worker=1, memory_limit="0")
     client = Client(cluster)
     logger.info(f"status: {client.dashboard_link}")
 
