@@ -74,7 +74,7 @@ def main(argv):
     ]
     logger.info(f"Found {len(all_files)} files to process")
 
-    file_bag = db.from_sequence(all_files, npartitions=args.workers * 4)
+    file_bag = db.from_sequence(all_files, npartitions=args.workers * 10)
 
     file_size_args = partial(file_size, input_dir=args.input, output_dir=args.output)
     audio_length_args = partial(audio_length, input_dir=args.input, output_dir=args.output)
