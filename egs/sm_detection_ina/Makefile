@@ -9,6 +9,7 @@ TF_CPP_MIN_LOG_LEVEL=3
 corpus_dir?=./test
 output_dir?=./.data
 workers?=4
+memory_limit?=0
 ############################################################
 install/req:
 	# conda create --name tasr python=3.13
@@ -27,7 +28,7 @@ $(output_dir):
 	mkdir -p $@
 	
 run: | $(output_dir)
-	$(python_cmd) local/run.py --input $(corpus_dir) --output $(output_dir) --workers $(workers)
+	$(python_cmd) local/run.py --input $(corpus_dir) --output $(output_dir) --workers $(workers) --memory_limit $(memory_limit)
 .PHONY: run	
 
 .EXPORT_ALL_VARIABLES:

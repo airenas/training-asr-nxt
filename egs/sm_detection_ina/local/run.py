@@ -6,19 +6,23 @@ from functools import partial
 
 import dask.bag as db
 from dask.distributed import Client
-from distributed import LocalCluster
+from distributed import LocalCluster, get_worker
 from inaSpeechSegmenter import Segmenter
 
 from preparation.cache.file import Params, file_cache_func
 from preparation.logger import logger
 
 
-def ina_segments(file_path, input_dir, output_dir: str, segmenter: Segmenter):
+def ina_segments(file_path, input_dir, output_dir: str):
     logger.debug(f"Processing file for ina segments: {file_path}")
+
+    worker = get_worker()
+    if not hasattr(worker, 'segmenter'):
+        worker.segmenter = init_segmenter()
 
     def segment_func(file_path_: str):
         logger.debug(f"call segments: {file_path}...")
-        segments = segmenter(file_path_)
+        segments = worker.segmenter(file_path_)
         logger.debug(f"got segments: {file_path}, {segments}")
         return segments
 
@@ -69,23 +73,30 @@ def calculate_total_smn(file_bag):
     ).compute()
 
 
+def init_segmenter():
+    return Segmenter(vad_engine="smn", detect_gender=False, ffmpeg="ffmpeg", batch_size=1)
+
+
+
 def main(argv):
     logger.info("Starting")
     parser = argparse.ArgumentParser(description="Runs audio processing")
     parser.add_argument("--input", nargs='?', required=True, help="Input dir")
     parser.add_argument("--output", nargs='?', required=True, help="Output dir")
     parser.add_argument("--workers", nargs='?', required=True, default=4, type=int, help="Workers count")
+    parser.add_argument("--memory_limit", nargs='?', required=True, default="0", type=str, help="Worker's max memory limit")
     args = parser.parse_args(args=argv)
 
-    logger.info(f"Input dir: {args.input}")
-    logger.info(f"Output dir: {args.output}")
-    logger.info(f"Workers   : {args.workers}")
+    logger.info(f"Input dir    : {args.input}")
+    logger.info(f"Output dir   : {args.output}")
+    logger.info(f"Workers      : {args.workers}")
+    logger.info(f"Worker's mem : {args.memory_limit}")
 
-    cluster = LocalCluster(n_workers=args.workers, threads_per_worker=1, memory_limit="0")
+    cluster = LocalCluster(n_workers=args.workers, threads_per_worker=1, memory_limit=args.memory_limit)
     client = Client(cluster)
     logger.info(f"status: {client.dashboard_link}")
 
-    seg = Segmenter(vad_engine="smn", detect_gender=False, ffmpeg="ffmpeg", batch_size=1)
+    # seg = Segmenter(vad_engine="smn", detect_gender=False, ffmpeg="ffmpeg", batch_size=1)
 
     all_files = [
         os.path.join(root, f)
@@ -96,7 +107,7 @@ def main(argv):
 
     file_bag = db.from_sequence(all_files, npartitions=args.workers * 50)
 
-    ina_segments_args = partial(ina_segments, input_dir=args.input, output_dir=args.output, segmenter=seg)
+    ina_segments_args = partial(ina_segments, input_dir=args.input, output_dir=args.output)
 
     processed_ina = file_bag.map(ina_segments_args)
 
