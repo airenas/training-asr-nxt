@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 import sys
 from collections import Counter
@@ -76,6 +77,21 @@ def calculate_total_smn(file_bag):
 def init_segmenter():
     return Segmenter(vad_engine="smn", detect_gender=False, ffmpeg="ffmpeg", batch_size=1)
 
+def to_mb(size_bytes):
+    """Convert bytes to megabytes."""
+    return size_bytes / (1024 * 1024)
+
+def log_file_size_histogram(sizes, bin_count=100):
+    min_size = min(sizes)
+    max_size = max(sizes)
+    bin_size = (max_size - min_size) / bin_count
+
+    bins = Counter([math.floor((size - min_size) / bin_size) for size in sizes])
+
+    all = 0
+    for bin_index, count in sorted(bins.items()):
+        all += count
+        logger.info(f"Bin {to_mb(bin_index * bin_size):.2f}-{to_mb((bin_index + 1) * bin_size):.2f} mb: {count}:{all} files")
 
 
 def main(argv):
@@ -85,12 +101,15 @@ def main(argv):
     parser.add_argument("--output", nargs='?', required=True, help="Output dir")
     parser.add_argument("--workers", nargs='?', required=True, default=4, type=int, help="Workers count")
     parser.add_argument("--memory_limit", nargs='?', required=True, default="0", type=str, help="Worker's max memory limit")
+    parser.add_argument("--limit_mb", nargs='?', default=50, type=float,
+                        help="File size limit")
     args = parser.parse_args(args=argv)
 
     logger.info(f"Input dir    : {args.input}")
     logger.info(f"Output dir   : {args.output}")
     logger.info(f"Workers      : {args.workers}")
     logger.info(f"Worker's mem : {args.memory_limit}")
+    logger.info(f"File limit   : {args.limit_mb}mb")
 
     cluster = LocalCluster(n_workers=args.workers, threads_per_worker=1, memory_limit=args.memory_limit)
     client = Client(cluster)
@@ -104,8 +123,23 @@ def main(argv):
         for f in files
     ]
     logger.info(f"Found {len(all_files)} files to process")
+    filtered_files, skipped = [], 0
+    sizes = []
+    logger.info(f"Calculating sizes ...")
+    for f in all_files:
+        if f.endswith(".m4a"):
+            size = os.path.getsize(f)
+            sizes.append(size)
+            if size < (args.limit_mb * 1024 * 1024):
+                filtered_files.append(f)
+            else:
+                skipped += 1
 
-    file_bag = db.from_sequence(all_files, npartitions=args.workers * 50)
+    log_file_size_histogram(sizes, 20)
+
+    logger.info(f"Filtered {len(filtered_files)} files, skipped {skipped} files")
+
+    file_bag = db.from_sequence(filtered_files, npartitions=args.workers * 50)
 
     ina_segments_args = partial(ina_segments, input_dir=args.input, output_dir=args.output)
 

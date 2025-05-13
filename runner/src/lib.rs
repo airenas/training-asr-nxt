@@ -1,0 +1,18 @@
+pub mod files;
+
+pub const APP_NAME: &str = "runner";
+
+#[derive(Clone)]
+pub struct Params<'a> {
+    pub input_dir: &'a str,
+    pub output_dir: &'a str,
+    pub file_name: &'a str,
+    pub result_file_name: &'a str,
+    pub cmd: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProcessStatus {
+    Success,
+    Skipped,
+}

@@ -10,9 +10,10 @@ ssh/8787:
 	ssh -L 8787:127.0.0.1:8787 -p $(port) $(user)@$(server)
 
 copy/scripts:
-	$(SSH_CMD) "mkdir -p train-asr"	
+	$(SSH_CMD) "mkdir -p train-asr/bin"	
 	scp -P $(port) -r ../../preparation  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../Makefile  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../requirements.txt  $(user)@$(server):~/train-asr/
 	scp -P $(port) -r ./remote/*  $(user)@$(server):~/train-asr/
 	scp -P $(port) -r ../../egs  $(user)@$(server):~/train-asr/
+	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
