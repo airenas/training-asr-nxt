@@ -123,7 +123,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let memory_threshold_mb = (args.minimum_memory.as_u64()) / (1024 * 1024);
 
     let active_workers = Arc::new(AtomicUsize::new(0));
-    let last_worker_time = Arc::new(Mutex::new(Instant::now())); 
+    let last_worker_time = Arc::new(Mutex::new(Instant::now()));
 
     // Process files in parallel using rayon
     files.par_iter().for_each(|file| {
@@ -135,42 +135,45 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         );
 
         let mut mem_waiting = args.slow_start;
+        let mut sleep = false;
 
         loop {
             if cancel_flag.load(Ordering::SeqCst) {
                 return;
             }
+            if sleep {
+                thread::sleep(Duration::from_secs(10));
+            }
             sys.refresh_memory();
             let available_memory_mb = sys.available_memory() / (1024 * 1024);
             if available_memory_mb < memory_threshold_mb {
-                tracing::trace!("Available mem: {:?}MB", available_memory_mb);
-                tracing::trace!("Total memory: {:?}MB", sys.total_memory() / (1024 * 1024));
-                tracing::trace!("Used memory: {:?}MB", sys.used_memory() / (1024 * 1024));
-                tracing::trace!("Wanted free limit: {:?}MB", memory_threshold_mb);
-                tracing::warn!(
+                tracing::trace!(
                     "Low memory: {}MB available. Wanted {}MB. Workers({}/{})",
-                    available_memory_mb, memory_threshold_mb, active_workers.load(Ordering::SeqCst), args.workers,
+                    available_memory_mb,
+                    memory_threshold_mb,
+                    active_workers.load(Ordering::SeqCst),
+                    args.workers,
                 );
                 mem_waiting = true;
-                thread::sleep(Duration::from_secs(10));
+                sleep = true;
             } else {
                 if mem_waiting {
                     let mut last_time = last_worker_time.lock().unwrap();
                     let elapsed = last_time.elapsed();
                     if elapsed < Duration::from_secs(10) {
-                        tracing::info!("Worker waiting");
-                        thread::sleep(Duration::from_secs(10));
+                        tracing::trace!("Worker waiting");
+                        sleep = true;
                         continue;
                     }
-                    *last_time = Instant::now();         
+                    *last_time = Instant::now();
                 }
                 break;
-            } 
+            }
         }
 
         {
             let mut last_time = last_worker_time.lock().unwrap();
-            *last_time = Instant::now(); 
+            *last_time = Instant::now();
         }
 
         if cancel_flag.load(Ordering::SeqCst) {
@@ -188,9 +191,24 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 
         tracing::debug!(file = file.display().to_string());
         active_workers.fetch_add(1, Ordering::SeqCst);
+        {
+            let pb = progress.lock().unwrap();
+            let success = *success_count.lock().unwrap();
+            let skipped = *skipped_count.lock().unwrap();
+            let failed = *failed_count.lock().unwrap();
+            let wrk_str = format!(
+                "{}/{}",
+                active_workers.load(Ordering::SeqCst),
+                args.workers
+            );
+            pb.set_message(
+                get_info_str(true, success + skipped, skipped, failed)
+                    + format!(", wrk: {}", wrk_str).as_str(),
+            );
+        }
         let res = files::run(&params);
         active_workers.fetch_sub(1, Ordering::SeqCst);
-        
+
         match res {
             Ok(runner::ProcessStatus::Success) => {
                 let mut success = success_count.lock().unwrap();
@@ -215,7 +233,15 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         let skipped = *skipped_count.lock().unwrap();
         let failed = *failed_count.lock().unwrap();
         let all = pb.length().unwrap_or_default();
-        pb.set_message(get_info_str(true, success + skipped, skipped, failed));
+        let wrk_str = format!(
+            "{}/{}",
+            active_workers.load(Ordering::SeqCst),
+            args.workers
+        );
+        pb.set_message(
+            get_info_str(true, success + skipped, skipped, failed)
+                + format!(", wrk: {}", wrk_str).as_str(),
+        );
         pb.inc(1);
 
         if !Term::stderr().is_term() {
@@ -226,6 +252,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             };
             tracing::info!(
                 msg = get_info_str(false, success + skipped, skipped, failed),
+                wrk=wrk_str,
                 eta = format_duration_most_significant(pb.eta()),
                 all,
                 "%" = format!("{:.2}", prc),
