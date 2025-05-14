@@ -1,18 +1,21 @@
 use std::{
     env,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
+    thread,
+    time::Duration,
 };
 
 use ansi_term::Color;
+use bytesize::ByteSize;
 use clap::Parser;
 use console::Term;
-use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use runner::{files, APP_NAME};
+use runner::{files, utils::format_duration_most_significant, APP_NAME};
+use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -38,12 +41,16 @@ struct Args {
     //Extensions for input files
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     extensions: Vec<String>,
-    /// Minimum Memory (in GB) on the system to be available start new worker
-    #[arg(long, env, default_value = "10")]
-    minimum_memory: u16,
+    /// Minimum Memory on the system to be available start new worker
+    #[arg(long, env, default_value = "10G",value_parser = parse_bytesize)]
+    minimum_memory: ByteSize,
     /// Output in the same dir as input - do not create new dir
     #[arg(long, env, default_value = "false")]
     same_dir: bool,
+}
+
+fn parse_bytesize(s: &str) -> Result<ByteSize, String> {
+    s.parse::<ByteSize>().map_err(|e| e.to_string())
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -68,7 +75,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(extensions = args.extensions.join(","));
     tracing::info!(output = args.output);
     tracing::info!(output_file = args.output_file);
-    tracing::info!(minimum_memory = args.minimum_memory);
+    tracing::info!(minimum_memory = args.minimum_memory.to_string());
     tracing::info!(same_dir = args.same_dir);
     tracing::info!(cmd = args.cmd);
     let cwd = env::current_dir()?;
@@ -110,10 +117,39 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let failed_count = Arc::new(Mutex::new(0));
     let skipped_count = Arc::new(Mutex::new(0));
     let success_count = Arc::new(Mutex::new(0));
+    let memory_threshold_mb = (args.minimum_memory.as_u64()) / (1024 * 1024);
+
+    let active_workers = Arc::new(AtomicUsize::new(0));
 
     // Process files in parallel using rayon
     files.par_iter().for_each(|file| {
         // files.iter().for_each(|file| {
+        let active_workers = active_workers.clone();
+
+        let mut sys = System::new_with_specifics(
+            RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()),
+        );
+
+        loop {
+            if cancel_flag.load(Ordering::SeqCst) {
+                return;
+            }
+            sys.refresh_memory();
+            let available_memory_mb = sys.available_memory() / (1024 * 1024);
+            if available_memory_mb < memory_threshold_mb {
+                tracing::trace!("Available mem: {:?}MB", available_memory_mb);
+                tracing::trace!("Total memory: {:?}MB", sys.total_memory() / (1024 * 1024));
+                tracing::trace!("Used memory: {:?}MB", sys.used_memory() / (1024 * 1024));
+                tracing::trace!("Wanted free limit: {:?}MB", memory_threshold_mb);
+                tracing::warn!(
+                    "Low memory detected: {}MB available. Wanted {}MB. Workers({}/{}) Waiting for memory to free up...",
+                    available_memory_mb, memory_threshold_mb, active_workers.load(Ordering::SeqCst), args.workers,
+                );
+                thread::sleep(Duration::from_secs(10));
+            } else {
+                break;
+            }
+        }
 
         if cancel_flag.load(Ordering::SeqCst) {
             return;
@@ -129,7 +165,10 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         };
 
         tracing::debug!(file = file.display().to_string());
+        active_workers.fetch_add(1, Ordering::SeqCst);
         let res = files::run(&params);
+        active_workers.fetch_sub(1, Ordering::SeqCst);
+        
         match res {
             Ok(runner::ProcessStatus::Success) => {
                 let mut success = success_count.lock().unwrap();
@@ -165,7 +204,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             };
             tracing::info!(
                 msg = get_info_str(false, success + skipped, skipped, failed),
-                eta = format_duration(pb.eta()).to_string(),
+                eta = format_duration_most_significant(pb.eta()),
                 all,
                 "%" = format!("{:.2}", prc),
             );
@@ -186,8 +225,8 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         if !Term::stderr().is_term() {
             tracing::info!(
                 msg = get_info_str(false, success + skipped, skipped, failed),
-                eta = format_duration(pb.eta()).to_string(),
                 all = pb.length(),
+                "Finished",
             );
         }
     }

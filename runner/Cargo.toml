@@ -26,9 +26,10 @@ walkdir = "2.5"
 indicatif = { version = "0.17", features = ["rayon", "tokio"] }
 rayon = "1.10.0"
 path-absolutize = "3.0"
-ansi_term = "0.12.1"
-console = "0.15.11"
-humantime = "2.2.0"
+ansi_term = "0.12"
+console = "0.15"
+sysinfo = "0.35"
+bytesize = "2.0.1"
 
 [dev-dependencies]
 tracing-test = "0.2"

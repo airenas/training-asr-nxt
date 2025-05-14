@@ -5,9 +5,7 @@ corpus_dir?=./test
 output_dir?=./.data
 runner?=../../runner/target/release/runner
 workers?=4
-memory_limit?=0
-limit_mb?=50
-RUST_LOG=info
+RUST_LOG?=trace
 ############################################################
 $(output_dir):
 	mkdir -p $@

@@ -12,8 +12,7 @@ corpus_dir?=./test
 output_dir?=./.data
 runner?=../../runner/target/release/runner
 workers?=4
-minimum_memory?=10
-limit_mb?=50
+minimum_memory?=10GB
 RUST_LOG?=trace
 ############################################################
 install/req:
