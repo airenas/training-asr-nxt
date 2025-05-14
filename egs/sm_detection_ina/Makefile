@@ -40,7 +40,7 @@ run/runner: | $(output_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/detect_smn.py --input {input} --output {output}" \
 		--output-file audio.ina_segments --extensions wav --minimum-memory $(minimum_memory) \
-		--same-dir
+		--same-dir --slow-start
 .PHONY: run/runner	
 
 .EXPORT_ALL_VARIABLES:

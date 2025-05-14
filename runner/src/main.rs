@@ -5,7 +5,7 @@ use std::{
         Arc, Mutex,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use ansi_term::Color;
@@ -47,6 +47,9 @@ struct Args {
     /// Output in the same dir as input - do not create new dir
     #[arg(long, env, default_value = "false")]
     same_dir: bool,
+    /// Slow start - start workers one by one
+    #[arg(long, env, default_value = "false")]
+    slow_start: bool,
 }
 
 fn parse_bytesize(s: &str) -> Result<ByteSize, String> {
@@ -120,6 +123,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let memory_threshold_mb = (args.minimum_memory.as_u64()) / (1024 * 1024);
 
     let active_workers = Arc::new(AtomicUsize::new(0));
+    let last_worker_time = Arc::new(Mutex::new(Instant::now())); 
 
     // Process files in parallel using rayon
     files.par_iter().for_each(|file| {
@@ -129,6 +133,8 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         let mut sys = System::new_with_specifics(
             RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()),
         );
+
+        let mut mem_waiting = args.slow_start;
 
         loop {
             if cancel_flag.load(Ordering::SeqCst) {
@@ -142,13 +148,29 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
                 tracing::trace!("Used memory: {:?}MB", sys.used_memory() / (1024 * 1024));
                 tracing::trace!("Wanted free limit: {:?}MB", memory_threshold_mb);
                 tracing::warn!(
-                    "Low memory detected: {}MB available. Wanted {}MB. Workers({}/{}) Waiting for memory to free up...",
+                    "Low memory: {}MB available. Wanted {}MB. Workers({}/{})",
                     available_memory_mb, memory_threshold_mb, active_workers.load(Ordering::SeqCst), args.workers,
                 );
+                mem_waiting = true;
                 thread::sleep(Duration::from_secs(10));
             } else {
+                if mem_waiting {
+                    let mut last_time = last_worker_time.lock().unwrap();
+                    let elapsed = last_time.elapsed();
+                    if elapsed < Duration::from_secs(10) {
+                        tracing::info!("Worker waiting");
+                        thread::sleep(Duration::from_secs(10));
+                        continue;
+                    }
+                    *last_time = Instant::now();         
+                }
                 break;
-            }
+            } 
+        }
+
+        {
+            let mut last_time = last_worker_time.lock().unwrap();
+            *last_time = Instant::now(); 
         }
 
         if cancel_flag.load(Ordering::SeqCst) {
