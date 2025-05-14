@@ -35,6 +35,15 @@ struct Args {
     /// Command
     #[arg(long, env, default_value = "")]
     cmd: String,
+    //Extensions for input files
+    #[arg(long, env, value_delimiter = ',', default_value = "")]
+    extensions: Vec<String>,
+    /// Minimum Memory (in GB) on the system to be available start new worker
+    #[arg(long, env, default_value = "10")]
+    minimum_memory: u16,
+    /// Output in the same dir as input - do not create new dir
+    #[arg(long, env, default_value = "false")]
+    same_dir: bool,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -56,8 +65,11 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(version = env!("CARGO_APP_VERSION"));
     tracing::info!(workers = args.workers);
     tracing::info!(input = args.input);
+    tracing::info!(extensions = args.extensions.join(","));
     tracing::info!(output = args.output);
     tracing::info!(output_file = args.output_file);
+    tracing::info!(minimum_memory = args.minimum_memory);
+    tracing::info!(same_dir = args.same_dir);
     tracing::info!(cmd = args.cmd);
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
@@ -81,7 +93,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     });
 
     tracing::info!("collecting files");
-    let files = runner::files::collect_files(&args.input)?;
+    let files = runner::files::collect_files(&args.input, &args.extensions)?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = Arc::new(Mutex::new(ProgressBar::new(files.len() as u64)));
@@ -113,6 +125,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             file_name: file.to_str().unwrap(),
             cmd: &args.cmd,
             result_file_name: &args.output_file,
+            same_dir: args.same_dir,
         };
 
         tracing::debug!(file = file.display().to_string());

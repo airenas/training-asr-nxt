@@ -9,6 +9,7 @@ pub struct Params<'a> {
     pub file_name: &'a str,
     pub result_file_name: &'a str,
     pub cmd: &'a str,
+    pub same_dir: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

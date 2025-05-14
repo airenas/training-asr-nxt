@@ -12,9 +12,9 @@ corpus_dir?=./test
 output_dir?=./.data
 runner?=../../runner/target/release/runner
 workers?=4
-memory_limit?=0
+minimum_memory?=10
 limit_mb?=50
-RUST_LOG=info
+RUST_LOG?=trace
 ############################################################
 install/req:
 	# conda create --name tasr python=3.13
@@ -38,9 +38,10 @@ run: | $(output_dir)
 .PHONY: run	
 
 run/runner: | $(output_dir)
-	$(runner) --input $(corpus_dir) --output $(output_dir) --workers $(workers) \
+	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/detect_smn.py --input {input} --output {output}" \
-		--output-file audio.ina_segments
+		--output-file audio.ina_segments --extensions wav --minimum-memory $(minimum_memory) \
+		--same-dir
 .PHONY: run/runner	
 
 .EXPORT_ALL_VARIABLES:

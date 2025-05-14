@@ -1,3 +1,5 @@
+import os
+print("PYTHONPATH in Python:", os.environ.get("PYTHONPATH"))
 import argparse
 import sys
 

@@ -9,14 +9,31 @@ use walkdir::WalkDir;
 
 use crate::{Params, ProcessStatus};
 
-pub fn collect_files(in_dir: &str) -> anyhow::Result<Vec<PathBuf>> {
+pub fn collect_files(in_dir: &str, extensions: &[String]) -> anyhow::Result<Vec<PathBuf>> {
+    let l_ext = extensions
+        .iter()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_lowercase())
+        .collect::<Vec<String>>();
+    
     let files: Vec<PathBuf> = WalkDir::new(in_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
+        .filter(|e| {
+            check_extension(e.path(), &l_ext)
+        })  
         .map(|e| e.path().canonicalize().ok().unwrap())
         .collect();
     Ok(files)
+}
+
+fn check_extension(e: &Path, extensions: &[String]) -> bool {
+    if extensions.is_empty() {
+        return true;
+    }
+    let ext = e.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+    extensions.iter().any(|ext2| &ext == ext2)
 }
 
 pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
@@ -25,6 +42,7 @@ pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
         params.input_dir,
         params.output_dir,
         params.result_file_name,
+        params.same_dir,
     )?;
     tracing::trace!(file = params.file_name, out = output_file.to_str());
     if output_file.exists() {
@@ -112,6 +130,7 @@ fn get_cache_file_name(
     input_dir: &str,
     output_dir: &str,
     name: &str,
+    same_dir: bool
 ) -> anyhow::Result<PathBuf> {
     let abs_input_dir = Path::new(input_dir)
         .absolutize()
@@ -128,7 +147,10 @@ fn get_cache_file_name(
         .strip_prefix(abs_input_dir.as_ref())
         .map_err(|e| anyhow::anyhow!("Failed to calculate relative path: {}", e))?;
 
-    let output_file_dir = abs_output_dir.join(relative_path);
+    let mut output_file_dir = abs_output_dir.join(relative_path);
+    if same_dir {
+        output_file_dir = output_file_dir.parent().unwrap().to_path_buf();
+    }
     let cache_file_path = output_file_dir.join(name);
     Ok(cache_file_path)
 }
@@ -140,29 +162,49 @@ mod tests {
     #[test]
     fn test_get_cache_file_name() {
         tracing_subscriber::fmt()
-            .with_test_writer() // Ensures logs are captured during tests
+            .with_test_writer() 
             .init();
+        // Define test cases
+        let test_cases = vec![
+            // Test case: simple
+            ("/input/file.m4a", "/input", "/output", "result.txt", false, "/output/file.m4a/result.txt"),
+            ("/input/file.m4a", "/input", "/output", "result.txt", true, "/output/result.txt"),
+            ("/input/olia/file.m4a", "/input", "/output", "result.txt", false, "/output/olia/file.m4a/result.txt"),
+            ("/input/olia/file.m4a", "/input", "/output", "result.txt", true, "/output/olia/result.txt"),
+        ];
 
-        let input_dir = "../input";
-        let output_dir = "../output";
-        let file_path = "../input/1/file.txt";
-        let name = "cache.json";
+        for (file_path, input_dir, output_dir, name, same_dir, expected) in test_cases {
+            let result = get_cache_file_name(file_path, input_dir, output_dir, name, same_dir).unwrap();
+            assert_eq!(result.to_str().unwrap(), expected);
+        }
+    }
 
-        // Call the function
-        let result = get_cache_file_name(file_path, input_dir, output_dir, name);
+    #[test]
+    fn test_check_extension() {
+        // Define test cases
+        let test_cases = vec![
+            // Test case: No extensions provided, should return true
+            (vec![], "file.txt", true),
+            // Test case: Matching extension
+            (vec!["txt".to_string()], "file.txt", true),
+            // Test case: Non-matching extension
+            (vec!["jpg".to_string()], "file.txt", false),
+            // Test case: Multiple extensions, one matches
+            (vec!["jpg".to_string(), "txt".to_string()], "file.txt", true),
+            // Test case: File with no extension
+            (vec!["txt".to_string()], "file", false),
+            // Test case: Empty file name
+            (vec!["txt".to_string()], "", false),
+        ];
 
-        assert!(result.is_ok());
-        let cache_file_path = result.unwrap();
-
-        let cache_file_path = cache_file_path.to_str().unwrap();
-
-        let current_dir = std::env::current_dir().unwrap();
-
-        let expected_output_file_dir = format!(
-            "{}/output/1/file.txt/cache.json",
-            current_dir.parent().unwrap().display()
-        );
-
-        assert_eq!(cache_file_path, expected_output_file_dir);
+        for (extensions, file_name, expected) in test_cases {
+            let path = std::path::Path::new(file_name);
+            let result = check_extension(path, &extensions);
+            assert_eq!(
+                result, expected,
+                "Failed for extensions: {:?}, file_name: {}",
+                extensions, file_name
+            );
+        }
     }
 }
