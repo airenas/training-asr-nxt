@@ -12,7 +12,7 @@ $(output_dir):
 	
 run/runner: | $(output_dir)
 	$(runner) --input $(corpus_dir) --output $(output_dir) --workers $(workers) \
-		--cmd "ffmpeg -i {input} -ar 16000 -ac 1 -f wav {output}" \
+		--cmd "ffmpeg -y -i {input} -ar 16000 -ac 1 -f wav {output}" \
 		--output-file audio.16.wav --extensions m4a
 .PHONY: run/runner	
 

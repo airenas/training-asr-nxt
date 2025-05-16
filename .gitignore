@@ -177,3 +177,5 @@ test
 .idea/
 **/Makefile.options
 Makefile.options
+.vscode/launch.json
+egs/id_lang/tmp

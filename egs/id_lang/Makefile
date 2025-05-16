@@ -11,6 +11,11 @@ output_dir?=./.data
 workers?=4
 memory_limit?=0
 limit_mb?=50
+runner?=../../runner/target/release/runner
+minimum_memory?=10GB
+PYTHONPATH=./../../
+LOG_LEVEL=$(log)
+RUST_LOG?=trace
 ############################################################
 install/req:
 	# conda create --name tasr python=3.13
@@ -29,8 +34,16 @@ $(output_dir):
 	mkdir -p $@
 	
 run: | $(output_dir)
-	$(python_cmd) local/run.py --input $(corpus_dir) --output $(output_dir) --workers $(workers) --memory_limit $(memory_limit) \
-	    --limit_mb $(limit_mb)
+# 	$(python_cmd) local/run.py --input $(corpus_dir) --output $(output_dir) --workers $(workers) --memory_limit $(memory_limit) \
+# 	    --limit_mb $(limit_mb)
+	$(python_cmd) local/id.py  --input $(corpus_dir) --output $(output_dir)
 .PHONY: run	
+
+run/runner: | $(output_dir)
+	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
+		--cmd "python local/id.py --input {input} --output {output}" \
+		--output-file lang_detect.jsonl --extensions wav --minimum-memory $(minimum_memory) \
+		--same-dir
+.PHONY: run/runner	
 
 .EXPORT_ALL_VARIABLES:
