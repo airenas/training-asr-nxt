@@ -50,8 +50,9 @@ def detect_language(audio_path, segments):
         part = extracted_audio(waveform, sample_rate, segment)
 
         lang, conf = detect_lang(language_id, part)
-        logger.info(f"Detected language: {lang} with confidence {conf}")
-        res += [LangRes(segment=segment, lang=lang, conf=conf)]
+        if lang:
+            logger.info(f"Detected language: {lang} with confidence {conf}")
+            res += [LangRes(segment=segment, lang=lang.split(":")[0], conf=conf)]
     return res
 
 
@@ -152,18 +153,20 @@ def main(argv):
     logger.info(f"Output file  : {args.output}")
     segments = load_segments(args.input)
     # logger.info(f"Got segments: {segments}")
-    for sl in [8, 5, 3, 1]:
+    for sl in [5, 3, 1]:
         test_segments = select_test_segments(segments, num_segments=5, min_len=sl)
         if len(test_segments) > 1:
             break
-    if len(test_segments) == 0:
-        raise RuntimeError(f"Failed to find test segments in {args.input}")
-    logger.info(f"Made test segments: {test_segments}")
-    res = detect_language(args.input, test_segments)
-    logger.info(f"Got results: {res}")
+    res = []
+    if len(test_segments) > 0:
+        logger.info(f"Made test segments: {test_segments}")
+        res = detect_language(args.input, test_segments)
+        logger.info(f"Got results: {res}")
+        
     with open(args.output, "w") as f:
         for r in res:
             f.write(json.dumps(r.to_dict(), ensure_ascii=False) + "\n")
+    logger.info(f"Done")
 
 
 if __name__ == "__main__":
