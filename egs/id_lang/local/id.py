@@ -1,14 +1,12 @@
 import argparse
 import io
 import json
-import math
-import os
-import re
 import sys
 
 import torchaudio
 
 from preparation.logger import logger
+from preparation.utils.sm_segments import Segment, load_segments
 
 
 def detect_lang(language_id, audio_buffer):
@@ -56,31 +54,6 @@ def detect_language(audio_path, segments):
     return res
 
 
-class Segment:
-    def __init__(self, label, start, end):
-        self.label = label
-        self.start = start
-        self.end = end
-
-    def __repr__(self):
-        return f"Segment(label={self.label}, start={self.start}, end={self.end})"
-
-    def len(self):
-        return self.end - self.start
-
-    def __eq__(self, other):
-        if not isinstance(other, Segment):
-            return False
-        return self.label == other.label and math.isclose(self.start, other.start) and math.isclose(self.end, other.end)
-
-    def to_dict(self):
-        return {
-            "label": self.label,
-            "start": self.start,
-            "end": self.end
-        }
-
-
 class LangRes:
     def __init__(self, segment, lang, conf):
         self.segment = segment
@@ -113,7 +86,7 @@ def find_segment(speech_segments, start, min_len):
 
 
 def select_test_segments(segments, num_segments=5, min_len=5):
-    speech_segments = [seg for seg in segments if seg.label == "speech"]
+    speech_segments = [seg for seg in segments if seg.label == SegmentLabel.SPEECH.value]
     total_duration = sum(s.end - s.start for s in speech_segments)
     logger.info(f"total speech duration: {total_duration}")
     parts_from = total_duration / num_segments + 1
@@ -125,20 +98,6 @@ def select_test_segments(segments, num_segments=5, min_len=5):
             if s not in res:
                 res.append(s)
     return res
-
-
-def load_segments(input_file):
-    dir_name = os.path.dirname(input_file)
-    segments_file = os.path.join(dir_name, "audio.ina_segments")
-
-    try:
-        with open(segments_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-        segments = re.findall(r'\["(.*?)", ([\d.]+), ([\d.]+)\]', content)
-        parsed_segments = [Segment(label, float(start), float(end)) for label, start, end in segments]
-        return parsed_segments
-    except Exception as e:
-        raise RuntimeError(f"Failed to load segments from {segments_file}: {e}")
 
 
 def main(argv):
@@ -162,7 +121,7 @@ def main(argv):
         logger.info(f"Made test segments: {test_segments}")
         res = detect_language(args.input, test_segments)
         logger.info(f"Got results: {res}")
-        
+
     with open(args.output, "w") as f:
         for r in res:
             f.write(json.dumps(r.to_dict(), ensure_ascii=False) + "\n")

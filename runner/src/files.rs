@@ -101,6 +101,8 @@ fn run_cmd(
         .ok_or_else(|| anyhow::anyhow!("Empty command"))?;
     let args = &parts[1..];
 
+    tracing::trace!(program = program, args = ?args, "Running command");
+
     let output = Command::new(program)
         .args(args)
         .stdout(Stdio::piped())
