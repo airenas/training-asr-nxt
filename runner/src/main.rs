@@ -14,7 +14,7 @@ use clap::Parser;
 use console::Term;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use runner::{files, utils::format_duration_most_significant, APP_NAME};
+use runner::{files, APP_NAME};
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -50,6 +50,9 @@ struct Args {
     /// Slow start - start workers one by one
     #[arg(long, env, default_value = "false")]
     slow_start: bool,
+    /// Cache file
+    #[arg(long, env, default_value = ".runner.file.cache")]
+    cache_file: String,
 }
 
 fn parse_bytesize(s: &str) -> Result<ByteSize, String> {
@@ -103,23 +106,24 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     });
 
     tracing::info!("collecting files");
-    let files = runner::files::collect_files(&args.input, &args.extensions)?;
+    let files = runner::files::collect_files(&args.input, &args.extensions, &args.cache_file)?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = Arc::new(Mutex::new(ProgressBar::new(files.len() as u64)));
     let pb = progress.clone();
 
     pb.lock().unwrap().set_style(
-        ProgressStyle::with_template(
-            "[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}",
-        )
-        .unwrap()
-        .progress_chars("##-"),
+        ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("##-"),
     );
 
     let failed_count = Arc::new(Mutex::new(0));
     let skipped_count = Arc::new(Mutex::new(0));
-    let success_count = Arc::new(Mutex::new(0));
+    let eta_calculator = Arc::new(Mutex::new(runner::utils::duration::ETACalculator::new(
+        files.len(),
+        100,
+    )?));
     let memory_threshold_mb = (args.minimum_memory.as_u64()) / (1024 * 1024);
 
     let active_workers = Arc::new(AtomicUsize::new(0));
@@ -193,16 +197,12 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         active_workers.fetch_add(1, Ordering::SeqCst);
         {
             let pb = progress.lock().unwrap();
-            let success = *success_count.lock().unwrap();
             let skipped = *skipped_count.lock().unwrap();
             let failed = *failed_count.lock().unwrap();
-            let wrk_str = format!(
-                "{}/{}",
-                active_workers.load(Ordering::SeqCst),
-                args.workers
-            );
+            let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
+            let eta_calculator = eta_calculator.lock().unwrap();
             pb.set_message(
-                get_info_str(true, success + skipped, skipped, failed)
+                get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
                     + format!(", wrk: {}", wrk_str).as_str(),
             );
         }
@@ -211,36 +211,37 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 
         match res {
             Ok(runner::ProcessStatus::Success) => {
-                let mut success = success_count.lock().unwrap();
-                *success += 1;
+                let mut eta = eta_calculator.lock().unwrap();
+                eta.add_completed_with_duration();
             }
             Ok(runner::ProcessStatus::Skipped) => {
                 let mut skipped = skipped_count.lock().unwrap();
                 *skipped += 1;
+                let mut eta = eta_calculator.lock().unwrap();
+                eta.add_completed();
             }
             Err(err) => {
                 let mut failed = failed_count.lock().unwrap();
+                *failed += 1;
+                let mut eta = eta_calculator.lock().unwrap();
+                eta.add_completed_with_duration();
                 tracing::error!(
                     file = file.display().to_string(),
                     err = %err,
                     "Error processing file"
                 );
-                *failed += 1;
             }
         }
         let pb = progress.lock().unwrap();
-        let success = *success_count.lock().unwrap();
         let skipped = *skipped_count.lock().unwrap();
         let failed = *failed_count.lock().unwrap();
         let all = pb.length().unwrap_or_default();
-        let wrk_str = format!(
-            "{}/{}",
-            active_workers.load(Ordering::SeqCst),
-            args.workers
-        );
+        let eta_calculator = eta_calculator.lock().unwrap();
+        let eta = eta_calculator.eta_str();
+        let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
         pb.set_message(
-            get_info_str(true, success + skipped, skipped, failed)
-                + format!(", wrk: {}", wrk_str).as_str(),
+            get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
+                + format!("({}), wrk: {}", eta, wrk_str).as_str(),
         );
         pb.inc(1);
 
@@ -251,9 +252,9 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
                 0.0
             };
             tracing::info!(
-                msg = get_info_str(false, success + skipped, skipped, failed),
-                wrk=wrk_str,
-                eta = format_duration_most_significant(pb.eta()),
+                msg = get_info_str(false, eta_calculator.completed() as i32, skipped, failed),
+                wrk = wrk_str,
+                eta = eta.as_ref(),
                 all,
                 "%" = format!("{:.2}", prc),
             );
@@ -262,18 +263,18 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 
     {
         let pb = progress.lock().unwrap();
-        let success = *success_count.lock().unwrap();
         let skipped = *skipped_count.lock().unwrap();
         let failed = *failed_count.lock().unwrap();
+        let eta_calculator = eta_calculator.lock().unwrap();
         let msg = format!(
             "{} - {}",
             Color::Green.bold().paint("Finished"),
-            get_info_str(true, success + skipped, skipped, failed)
+            get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
         );
         pb.finish_with_message(msg);
         if !Term::stderr().is_term() {
             tracing::info!(
-                msg = get_info_str(false, success + skipped, skipped, failed),
+                msg = get_info_str(false, eta_calculator.completed() as i32, skipped, failed),
                 all = pb.length(),
                 "Finished",
             );
@@ -286,7 +287,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 
 fn get_info_str(use_color: bool, ok: i32, skipped: i32, failed: i32) -> String {
     format!(
-        "ok: {}, skipped: {}, failed: {}",
+        "done: {}, skipped: {}, failed: {}",
         paint(use_color, Color::Green, ok),
         paint(use_color, Color::Yellow, skipped),
         paint(use_color, Color::Red, failed)

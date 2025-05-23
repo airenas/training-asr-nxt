@@ -7,24 +7,38 @@ use anyhow::{self, Ok};
 use path_absolutize::Absolutize;
 use walkdir::WalkDir;
 
-use crate::{Params, ProcessStatus};
+use crate::{
+    utils::cache::{load_cache, save_cache},
+    Params, ProcessStatus,
+};
 
-pub fn collect_files(in_dir: &str, extensions: &[String]) -> anyhow::Result<Vec<PathBuf>> {
+pub fn collect_files(
+    in_dir: &str,
+    extensions: &[String],
+    cache_file: &str,
+) -> anyhow::Result<Vec<PathBuf>> {
+    tracing::trace!(in_dir = in_dir, extensions = ?extensions, cache_file = cache_file);
+    let res = load_cache(cache_file)?;
+    if !res.is_empty() {
+        tracing::trace!("Loaded file list from cache");
+        return Ok(res);
+    }
+
     let l_ext = extensions
         .iter()
         .filter(|s| !s.is_empty())
         .map(|s| s.to_lowercase())
         .collect::<Vec<String>>();
-    
+
     let files: Vec<PathBuf> = WalkDir::new(in_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-        .filter(|e| {
-            check_extension(e.path(), &l_ext)
-        })  
+        .filter(|e| check_extension(e.path(), &l_ext))
         .map(|e| e.path().canonicalize().ok().unwrap())
         .collect();
+
+    save_cache(cache_file, &files)?;
     Ok(files)
 }
 
@@ -32,7 +46,11 @@ fn check_extension(e: &Path, extensions: &[String]) -> bool {
     if extensions.is_empty() {
         return true;
     }
-    let ext = e.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+    let ext = e
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     extensions.iter().any(|ext2| &ext == ext2)
 }
 
@@ -132,7 +150,7 @@ fn get_cache_file_name(
     input_dir: &str,
     output_dir: &str,
     name: &str,
-    same_dir: bool
+    same_dir: bool,
 ) -> anyhow::Result<PathBuf> {
     let abs_input_dir = Path::new(input_dir)
         .absolutize()
@@ -163,20 +181,47 @@ mod tests {
 
     #[test]
     fn test_get_cache_file_name() {
-        tracing_subscriber::fmt()
-            .with_test_writer() 
-            .init();
+        tracing_subscriber::fmt().with_test_writer().init();
         // Define test cases
         let test_cases = vec![
             // Test case: simple
-            ("/input/file.m4a", "/input", "/output", "result.txt", false, "/output/file.m4a/result.txt"),
-            ("/input/file.m4a", "/input", "/output", "result.txt", true, "/output/result.txt"),
-            ("/input/olia/file.m4a", "/input", "/output", "result.txt", false, "/output/olia/file.m4a/result.txt"),
-            ("/input/olia/file.m4a", "/input", "/output", "result.txt", true, "/output/olia/result.txt"),
+            (
+                "/input/file.m4a",
+                "/input",
+                "/output",
+                "result.txt",
+                false,
+                "/output/file.m4a/result.txt",
+            ),
+            (
+                "/input/file.m4a",
+                "/input",
+                "/output",
+                "result.txt",
+                true,
+                "/output/result.txt",
+            ),
+            (
+                "/input/olia/file.m4a",
+                "/input",
+                "/output",
+                "result.txt",
+                false,
+                "/output/olia/file.m4a/result.txt",
+            ),
+            (
+                "/input/olia/file.m4a",
+                "/input",
+                "/output",
+                "result.txt",
+                true,
+                "/output/olia/result.txt",
+            ),
         ];
 
         for (file_path, input_dir, output_dir, name, same_dir, expected) in test_cases {
-            let result = get_cache_file_name(file_path, input_dir, output_dir, name, same_dir).unwrap();
+            let result =
+                get_cache_file_name(file_path, input_dir, output_dir, name, same_dir).unwrap();
             assert_eq!(result.to_str().unwrap(), expected);
         }
     }
