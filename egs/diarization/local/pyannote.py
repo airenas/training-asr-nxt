@@ -64,7 +64,7 @@ def cut_non_speech_regions(speakers_seg: List[Segment], speech_seg: List[Segment
 
 
 def restore_time(data: Annotation, speech_segments: List[Segment]) -> Annotation:
-    res = Annotation()
+    res = Annotation(uri="waveform")
     offset = 0.0
     segments = list(data.itertracks(yield_label=True))
     segments.sort(key=lambda x: x[0].start)  # Sort segments by start time
@@ -103,11 +103,16 @@ def main(argv):
         logger.info(f"Got results: {res}")
 
     if not isinstance(res, list):
-        res = restore_time(res, speech_segments)
+        fixed = restore_time(res, speech_segments)
 
     with open(args.output, "w") as f:
         if not isinstance(res, list):
-            res.write_rttm(f)
+            fixed.write_rttm(f)
+
+            dir_name = os.path.dirname(args.output)
+            speech_file = os.path.join(dir_name, "speech.rttm")
+            with open(speech_file, "w") as fp:
+                res.write_rttm(fp)
         else:
             logger.warn("Got empty result")
 

@@ -46,12 +46,12 @@ fn check_extension(e: &Path, extensions: &[String]) -> bool {
     if extensions.is_empty() {
         return true;
     }
-    let ext = e
-        .extension()
+    let file_name = e
+        .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    extensions.iter().any(|ext2| &ext == ext2)
+    extensions.iter().any(|ext| file_name.ends_with(ext))
 }
 
 pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {

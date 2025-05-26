@@ -122,7 +122,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let skipped_count = Arc::new(Mutex::new(0));
     let eta_calculator = Arc::new(Mutex::new(runner::utils::duration::ETACalculator::new(
         files.len(),
-        100,
+        200,
     )?));
     let memory_threshold_mb = (args.minimum_memory.as_u64()) / (1024 * 1024);
 

@@ -42,8 +42,15 @@ run: | $(output_dir)
 run/runner: | $(output_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/pyannote.py --input {input} --output {output}" \
-		--output-file speech.rttm --extensions wav --minimum-memory $(minimum_memory) \
+		--output-file audio.rttm --extensions wav --minimum-memory $(minimum_memory) \
 		--same-dir
 .PHONY: run/runner	
+
+run/runner/grid: | $(output_dir)
+	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
+		--cmd "python local/to_textgrid.py --input {input} --output {output}" \
+		--output-file audio.textGrid --extensions audio.rttm --minimum-memory $(minimum_memory) \
+		--same-dir --cache-file .runner.tg.cache
+.PHONY: run/runner/grid
 
 .EXPORT_ALL_VARIABLES:
