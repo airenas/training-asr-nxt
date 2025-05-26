@@ -92,7 +92,8 @@ impl ETACalculator {
         if eta.as_secs() == 0 {
             return Cow::Borrowed("--");
         }
-        Cow::Owned(format_duration_most_significant(eta))
+        // Cow::Owned(format_duration_most_significant(eta))
+        Cow::Owned(format!("{}-{}", format_duration_most_significant(eta), self.durations.data.len()))
     }
     pub fn completed(&self) -> usize {
         self.completed

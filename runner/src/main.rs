@@ -203,7 +203,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             let eta_calculator = eta_calculator.lock().unwrap();
             pb.set_message(
                 get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
-                    + format!(", wrk: {}", wrk_str).as_str(),
+                    + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
             );
         }
         let res = files::run(&params);
@@ -241,7 +241,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
         pb.set_message(
             get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
-                + format!("({}), wrk: {}", eta, wrk_str).as_str(),
+                + format!(", ({}), wrk: {}", eta, wrk_str).as_str(),
         );
         pb.inc(1);
 
