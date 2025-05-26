@@ -8,10 +8,11 @@ class SegmentLabel(Enum):
     SPEECH = "speech"
     MUSIC = "music"
     NO_ENERGY = "noEnergy"
+    NOISE = "noise"
 
 
 class Segment:
-    def __init__(self, label, start, end):
+    def __init__(self, label: str, start: float, end: float):
         self.label = label
         self.start = start
         self.end = end
@@ -47,3 +48,7 @@ def load_segments(input_file):
         return parsed_segments
     except Exception as e:
         raise RuntimeError(f"Failed to load segments from {segments_file}: {e}")
+
+
+def select_speech(segments):
+    return [seg for seg in segments if seg.label == SegmentLabel.SPEECH.value]
