@@ -25,7 +25,7 @@ def main(argv):
     dir_name = os.path.dirname(args.input)
     sm_file = os.path.join(dir_name, "audio.ina_segments")
     sm_segments = load_segments(sm_file)
-    max_time = max(segment.end for segment in sm_segments)
+    max_time = max(segment.end for segment in sm_segments) + 0.01
 
 
     annotation = load_rttm(args.input).get('waveform')

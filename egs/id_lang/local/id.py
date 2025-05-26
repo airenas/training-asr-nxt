@@ -74,7 +74,7 @@ class LangRes:
 def find_segment(speech_segments, start, min_len):
     to = start + min_len
     for s in speech_segments:
-        if s.len() < min_len:
+        if s.duration < min_len:
             continue
         if s.start >= start:
             return Segment(s.label, s.start, s.start + min_len)

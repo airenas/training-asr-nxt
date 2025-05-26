@@ -20,7 +20,8 @@ class Segment:
     def __repr__(self):
         return f"Segment(label={self.label}, start={self.start}, end={self.end})"
 
-    def len(self):
+    @property
+    def duration(self):
         return self.end - self.start
 
     def __eq__(self, other):
