@@ -12,7 +12,8 @@ install/req:
 	# conda create --name tasr python=3.12
 	pip install -r requirements.txt
 	## don't work in requirements.txt ?!
-	## pip install --cache-dir ..... torchaudio torch speechbrain pyannote.audio
+	## pip install --cache-dir ..... torchaudio torch speechbrain pyannote.audio faiss-cpu
+
 
 
 test/unit:

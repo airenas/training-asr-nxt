@@ -180,3 +180,4 @@ Makefile.options
 .vscode/launch.json
 egs/id_lang/tmp
 **/.runner.**
+**/.data/**

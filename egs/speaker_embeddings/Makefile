@@ -24,15 +24,25 @@ install/req:
 $(output_dir):
 	mkdir -p $@
 	
-run: | $(output_dir)
-	$(python_cmd) local/embeddings.py  --input $(corpus_dir) --output $(output_dir)
-.PHONY: run	
-
 run/runner: | $(output_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/embeddings.py --input {input} --output {output}" \
-		--output-file speaker.embeddings.jsonb --extensions audio.rttm --minimum-memory $(minimum_memory) \
+		--output-file speaker.embeddings.jsonl --extensions audio.rttm --minimum-memory $(minimum_memory) \
 		--same-dir
 .PHONY: run/runner	
+
+.data:
+	mkdir -p $@
+
+.data/all.embeddings.jsonl:  | .data
+	$(python_cmd) local/collect_all.py  --input $(output_dir) --output $@
+
+collect: .data/all.embeddings.jsonl
+.PHONY: collect
+
+.data/clustered.jsonl: .data/all.embeddings.jsonl | .data
+	$(python_cmd) local/cluster.py --input .data/all.embeddings.jsonl --output $@
+cluster: .data/clustered.jsonl
+.PHONY: cluster
 
 .EXPORT_ALL_VARIABLES:
