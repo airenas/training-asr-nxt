@@ -8,6 +8,7 @@ python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
 TF_CPP_MIN_LOG_LEVEL=3
 corpus_dir?=./test
 output_dir?=./.data
+cache_dir=./../../.cache
 workers?=4
 memory_limit?=0
 limit_mb?=50
@@ -17,18 +18,14 @@ PYTHONPATH=./../../
 LOG_LEVEL=$(log)
 RUST_LOG?=trace
 ############################################################
-install/req:
-	# conda create --name tasr python=3.13
-	pip install -r requirements.txt
-############################################################
-$(output_dir):
+$(output_dir) $(cache_dir):
 	mkdir -p $@
 	
-run/runner: | $(output_dir)
+run/runner: | $(output_dir)  $(cache_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/embeddings.py --input {input} --output {output}" \
 		--output-file speaker.embeddings.jsonl --extensions audio.rttm --minimum-memory $(minimum_memory) \
-		--same-dir
+		--same-dir --cache-file $(cache_dir)/.embeddings.cache
 .PHONY: run/runner	
 
 .data:

@@ -31,7 +31,7 @@ def main(argv):
     logger.info(f"Input dir    : {args.input}")
     logger.info(f"Output file  : {args.output}")
 
-    res = collect_embeddings(args.input, "speaker.embeddings.jsonb")
+    res = collect_embeddings(args.input, "speaker.embeddings.jsonl")
 
     with open(args.output, "w") as f:
         for v in res:

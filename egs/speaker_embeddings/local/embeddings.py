@@ -38,7 +38,7 @@ class Params:
         self.file = file
         self.audio = None
         self.model = None
-        self.gpu = False
+        self.gpu = True
 
     def get_model(self):
         if self.model is None:
