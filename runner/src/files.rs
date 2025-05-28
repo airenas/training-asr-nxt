@@ -3,7 +3,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{self, Ok};
+use anyhow::{self};
 use path_absolutize::Absolutize;
 use walkdir::WalkDir;
 
@@ -29,12 +29,18 @@ pub fn collect_files(
         .filter(|s| !s.is_empty())
         .map(|s| s.to_lowercase())
         .collect::<Vec<String>>();
+    let (suffix, extensions) = if !l_ext.is_empty() {
+        (l_ext[0].clone(), l_ext[1..].to_vec())
+    } else {
+        (String::new(), Vec::new())
+    };
 
     let files: Vec<PathBuf> = WalkDir::new(in_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-        .filter(|e| check_extension(e.path(), &l_ext))
+        .filter(|e| check_suffix(e.path(), &suffix))
+        .filter(|e| check_extensions(e.path(), &extensions))
         .map(|e| e.path().canonicalize().ok().unwrap())
         .collect();
 
@@ -42,8 +48,8 @@ pub fn collect_files(
     Ok(files)
 }
 
-fn check_extension(e: &Path, extensions: &[String]) -> bool {
-    if extensions.is_empty() {
+fn check_suffix(e: &Path, suffix: &str) -> bool {
+    if suffix.is_empty() {
         return true;
     }
     let file_name = e
@@ -51,7 +57,36 @@ fn check_extension(e: &Path, extensions: &[String]) -> bool {
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    extensions.iter().any(|ext| file_name.ends_with(ext))
+    file_name.ends_with(suffix)
+}
+
+fn check_extensions(e: &Path, extensions: &[String]) -> bool {
+    if extensions.is_empty() {
+        return true;
+    }
+    let dir = match e.parent() {
+        Some(d) => d,
+        None => return false,
+    };
+    let entries = std::fs::read_dir(dir);
+    let files = match entries {
+        Ok(entries) => entries,
+        Err(e) => {
+            tracing::error!("Failed to read directory: {}: {}", dir.to_str().unwrap(), e);
+            return false;
+        }
+    };
+
+    for f in files.flatten() {
+        if let Some(name) = f.file_name().to_str().map(|s| s.to_lowercase()) {
+            if f.file_type().map(|ft| ft.is_file()).unwrap_or(false)
+                && extensions.iter().any(|ext| name.ends_with(ext))
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
@@ -227,26 +262,23 @@ mod tests {
     }
 
     #[test]
-    fn test_check_extension() {
+    fn test_check_suffix() {
         // Define test cases
         let test_cases = vec![
             // Test case: No extensions provided, should return true
-            (vec![], "file.txt", true),
+            ("", "file.txt", true),
             // Test case: Matching extension
-            (vec!["txt".to_string()], "file.txt", true),
+            ("txt", "file.txt", true),
             // Test case: Non-matching extension
-            (vec!["jpg".to_string()], "file.txt", false),
+            ("jpg", "file.txt", false),
             // Test case: Multiple extensions, one matches
-            (vec!["jpg".to_string(), "txt".to_string()], "file.txt", true),
+            ("file.txt", "file.txt", true),
             // Test case: File with no extension
-            (vec!["txt".to_string()], "file", false),
-            // Test case: Empty file name
-            (vec!["txt".to_string()], "", false),
         ];
 
         for (extensions, file_name, expected) in test_cases {
             let path = std::path::Path::new(file_name);
-            let result = check_extension(path, &extensions);
+            let result = check_suffix(path, &extensions);
             assert_eq!(
                 result, expected,
                 "Failed for extensions: {:?}, file_name: {}",

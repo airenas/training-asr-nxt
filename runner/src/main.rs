@@ -38,7 +38,7 @@ struct Args {
     /// Command
     #[arg(long, env, default_value = "")]
     cmd: String,
-    //Extensions for input files
+    //Extensions for input files. After comman other required files in the ssame dir wanted
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     extensions: Vec<String>,
     /// Minimum Memory on the system to be available start new worker
