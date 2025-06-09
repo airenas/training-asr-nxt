@@ -28,11 +28,18 @@ run: | $(output_dir)
 	$(python_cmd) local/id.py  --input $(corpus_dir) --output $(output_dir)
 .PHONY: run	
 
-run/runner: | $(output_dir)  $(cache_dir)
+run/runner/file: | $(output_dir)  $(cache_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/id.py --input {input} --output {output}" \
 		--output-file lang_detect.jsonl --extensions wav --minimum-memory $(minimum_memory) \
-		--same-dir --cache-file $(cache_dir)/.language.cache
-.PHONY: run/runner	
+		--same-dir --cache-file $(cache_dir)/.language.file.cache
+.PHONY: run/runner/file	
+
+run/runner/speaker: | $(output_dir)  $(cache_dir)
+	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
+		--cmd "python local/id_speaker.py --input {input} --output {output}" \
+		--output-file lang_detect_speaker.jsonl --extensions wav --minimum-memory $(minimum_memory) \
+		--same-dir --cache-file $(cache_dir)/.language.speaker.cache
+.PHONY: run/runner/speaker	
 
 .EXPORT_ALL_VARIABLES:

@@ -1,74 +1,10 @@
 import argparse
-import io
 import json
 import sys
 
-import torchaudio
-
 from preparation.logger import logger
-from preparation.utils.sm_segments import Segment, load_segments
-
-
-def detect_lang(language_id, audio_buffer):
-    try:
-        # signal = language_id.load_audio(audio_path)
-        signal, sample_rate = torchaudio.load(audio_buffer)
-        prediction = language_id.classify_batch(signal)
-        _, log_prob_target, _, predicted_lang = prediction
-        predicted = predicted_lang[0]
-        confidence = log_prob_target.exp().item()
-        return predicted, confidence
-    except Exception as e:
-        logger.error(f"{audio_buffer}: ERROR - {e}")
-        return None, 0.0
-
-
-def extracted_audio(waveform, sample_rate, segment):
-    start_sample = int(segment.start * sample_rate)
-    end_sample = int(segment.end * sample_rate)
-    part = waveform[:, start_sample:end_sample]
-
-    buffer = io.BytesIO()
-    torchaudio.save(buffer, part, sample_rate, format="wav")
-    buffer.seek(0)
-    return buffer
-
-
-def detect_language(audio_path, segments):
-    from speechbrain.inference.classifiers import EncoderClassifier
-
-    language_id = EncoderClassifier.from_hparams(
-        source="speechbrain/lang-id-voxlingua107-ecapa",
-        savedir="tmp/lang-id"
-    )
-
-    waveform, sample_rate = torchaudio.load(audio_path)
-    res = []
-    for segment in segments:
-        part = extracted_audio(waveform, sample_rate, segment)
-
-        lang, conf = detect_lang(language_id, part)
-        if lang:
-            logger.info(f"Detected language: {lang} with confidence {conf}")
-            res += [LangRes(segment=segment, lang=lang.split(":")[0], conf=conf)]
-    return res
-
-
-class LangRes:
-    def __init__(self, segment, lang, conf):
-        self.segment = segment
-        self.lang = lang
-        self.conf = conf
-
-    def to_dict(self):
-        return {
-            "segment": self.segment.to_dict(),
-            "lang": self.lang,
-            "conf": self.conf
-        }
-
-    def __repr__(self):
-        return f"LangRes(segment={self.segment}, lang={self.lang}, conf={self.conf})"
+from preparation.utils.language import detect_language
+from preparation.utils.sm_segments import Segment, load_segments, SegmentLabel
 
 
 def find_segment(speech_segments, start, min_len):
@@ -77,11 +13,11 @@ def find_segment(speech_segments, start, min_len):
         if s.duration < min_len:
             continue
         if s.start >= start:
-            return Segment(s.label, s.start, s.start + min_len)
+            return Segment(label=s.label, start=s.start, end=s.start + min_len)
         if s.end >= to:
-            return Segment(s.label, s.end - min_len, s.end)
+            return Segment(label=s.label, start=s.end - min_len, end=s.end)
         if s.start < start and s.end > to:
-            return Segment(s.label, start, to)
+            return Segment(label=s.label, start=start, end=to)
     return None
 
 

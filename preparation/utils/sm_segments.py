@@ -12,7 +12,7 @@ class SegmentLabel(Enum):
 
 
 class Segment:
-    def __init__(self, label: str, start: float, end: float):
+    def __init__(self, start: float, end: float, label: str = ""):
         self.label = label
         self.start = start
         self.end = end
@@ -30,11 +30,13 @@ class Segment:
         return self.label == other.label and math.isclose(self.start, other.start) and math.isclose(self.end, other.end)
 
     def to_dict(self):
-        return {
-            "label": self.label,
+        res = {
             "start": self.start,
             "end": self.end
         }
+        if self.label:
+            res["label"] = self.label
+        return res
 
 
 def load_segments(input_file):
@@ -45,7 +47,7 @@ def load_segments(input_file):
         with open(segments_file, 'r', encoding='utf-8') as f:
             content = f.read()
         segments = re.findall(r'\["(.*?)", ([\d.]+), ([\d.]+)\]', content)
-        parsed_segments = [Segment(label, float(start), float(end)) for label, start, end in segments]
+        parsed_segments = [Segment(label=label, start=float(start), end=float(end)) for label, start, end in segments]
         return parsed_segments
     except Exception as e:
         raise RuntimeError(f"Failed to load segments from {segments_file}: {e}")

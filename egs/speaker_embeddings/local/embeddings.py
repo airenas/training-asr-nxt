@@ -6,20 +6,11 @@ import sys
 import random
 
 import torchaudio
-from pyannote.core import Annotation, Timeline
 
 from preparation.logger import logger
 from preparation.utils.audio import Audio
+from preparation.utils.rttm import load_rttm, remove_overlaps
 from preparation.utils.sm_segments import Segment
-
-
-def load_rttm(input_file):
-    dir_name = os.path.dirname(input_file)
-    res_file = os.path.join(dir_name, "audio.rttm")
-
-    from pyannote.database.util import load_rttm
-
-    return load_rttm(res_file).get('waveform', [])
 
 
 def extracted_audio(waveform, sample_rate, segment):
@@ -58,22 +49,6 @@ class Params:
         return self.audio
 
 
-def remove_overlaps(annotation: Annotation, speaker) -> Annotation:
-    overlap = annotation.get_overlap()
-    cleaned = Annotation()
-
-    for speaker in annotation.labels():
-        speaker_segments = Timeline([
-            segment for segment, _, label in annotation.itertracks(yield_label=True)
-            if label == speaker
-        ])
-        trimmed = speaker_segments.extrude(overlap, mode='intersection')
-        for segment in trimmed:
-            cleaned[segment] = speaker
-
-    return cleaned
-
-
 def chop_segment(segment: Segment, chunk_duration: float) -> list[Segment]:
     s = Segment(start=segment.start, end=segment.end, label=segment.label)
     res = []
@@ -90,7 +65,6 @@ def get_speaker_segments_for_embedding(annotation, speaker: str,
                                        max_total_duration: float = 120.0,
                                        min_segment_duration: float = 3.0,
                                        slice_chunk_duration: float = 20.0) -> list[Segment]:
-    annotation = remove_overlaps(annotation, speaker)
     segments = [Segment(start=s.start, end=s.end, label=speaker) for s, _, label in
                 annotation.itertracks(yield_label=True) if
                 label == speaker]
@@ -136,6 +110,7 @@ def main(argv):
 
     params = Params(os.path.join(dir_name, "audio.16.wav"))
     annotations = load_rttm(args.input)
+    annotations = remove_overlaps(annotations)
     res = {}
     if len(annotations) > 0:
         logger.info(f"loaded rttm lines: {len(annotations)}")
