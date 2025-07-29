@@ -181,3 +181,4 @@ Makefile.options
 egs/id_lang/tmp
 **/.runner.**
 **/.data/**
+.backup/

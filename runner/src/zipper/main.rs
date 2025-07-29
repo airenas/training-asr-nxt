@@ -112,7 +112,6 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         zip.write_all(&buffer)?;
         progress.inc(1);
         if cancel_flag.load(Ordering::SeqCst) {
-            tracing::info!("Zipping cancelled by user");
             return Err(anyhow::anyhow!("Zipping cancelled by user"));
         }
     }

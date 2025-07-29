@@ -48,4 +48,8 @@ run/runner/grid: | $(output_dir) $(cache_dir)
 		--same-dir --cache-file $(cache_dir)/.grid.cache
 .PHONY: run/runner/grid
 
+backup/res: 
+	$(zipper) --input $(output_dir) --output-file rttm.zip --names="audio.rttm, speech.rttm"
+.PHONY: backup/res
+
 .EXPORT_ALL_VARIABLES:

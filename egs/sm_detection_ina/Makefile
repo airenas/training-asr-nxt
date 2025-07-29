@@ -34,6 +34,6 @@ run/runner: | $(output_dir)  $(cache_dir)
 
 backup/res: 
 	$(zipper) --input $(output_dir) --output-file ina_segments.zip --names="audio.ina_segments"
-.PHONY: run/runner
+.PHONY: backup/res
 
 .EXPORT_ALL_VARIABLES:

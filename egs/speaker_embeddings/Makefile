@@ -28,6 +28,10 @@ run/runner: | $(output_dir)  $(cache_dir)
 		--same-dir --cache-file $(cache_dir)/.embeddings.cache
 .PHONY: run/runner	
 
+backup/res: 
+	$(zipper) --input $(output_dir) --output-file speaker.embeddings.zip --names="speaker.embeddings.jsonl"
+.PHONY: backup/res
+
 .data:
 	mkdir -p $@
 
