@@ -29,7 +29,8 @@ path-absolutize = "3.0"
 ansi_term = "0.12"
 console = "0.15"
 sysinfo = "0.35"
-bytesize = "2.0.1"
+bytesize = "2.0"
+zip = "4.3"
 
 [dev-dependencies]
 tracing-test = "0.2"
@@ -41,3 +42,7 @@ tonic-build = "0.12"
 [[bin]]
 name = "runner"
 path = "src/main.rs"
+
+[[bin]]
+name = "zipper"
+path = "src/zipper/main.rs"

@@ -35,7 +35,7 @@ pub fn collect_files(
         (String::new(), Vec::new())
     };
 
-    let files: Vec<PathBuf> = WalkDir::new(in_dir)
+    let mut files: Vec<PathBuf> = WalkDir::new(in_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
@@ -43,8 +43,33 @@ pub fn collect_files(
         .filter(|e| check_extensions(e.path(), &extensions))
         .map(|e| e.path().canonicalize().ok().unwrap())
         .collect();
+    tracing::debug!(len = files.len(), "Found files in directory");
+    files.sort();
+    tracing::debug!("Sorted");
 
     save_cache(cache_file, &files)?;
+    Ok(files)
+}
+
+pub fn collect_all_files(in_dir: &str, names: &[String]) -> anyhow::Result<Vec<PathBuf>> {
+    let l_names = names
+        .iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+
+    let mut files: Vec<PathBuf> = WalkDir::new(in_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| has_name(e.path(), &l_names))
+        .map(|e| e.path().canonicalize().ok().unwrap())
+        .collect();
+    tracing::debug!(len = files.len(), "Found files in directory");
+    files.sort();
+    tracing::debug!("Sorted");
+
     Ok(files)
 }
 
@@ -58,6 +83,11 @@ fn check_suffix(e: &Path, suffix: &str) -> bool {
         .unwrap_or("")
         .to_lowercase();
     file_name.ends_with(suffix)
+}
+
+fn has_name(e: &Path, suffix: &[String]) -> bool {
+    let file = e.file_name().and_then(|s| s.to_str()).unwrap_or("");
+    suffix.iter().any(|s| s == file)
 }
 
 fn check_extensions(e: &Path, extensions: &[String]) -> bool {

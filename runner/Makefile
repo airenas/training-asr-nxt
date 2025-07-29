@@ -11,8 +11,13 @@ run:
 .PHONY: run
 ###############################################################################
 build/local: 
-	cargo build --release --bin runner
+	cargo build --release --bin runner --bin zipper
 .PHONY: build/local
+###############################################################################
+run/zipper:
+	RUST_LOG=trace cargo run --bin zipper -- --input=../.calc-data --output-file=1.zip \
+	--names="audio.rttm,audio.ina_segments"
+.PHONY: run
 ###############################################################################
 test/unit:
 	RUST_LOG=DEBUG cargo test --no-fail-fast

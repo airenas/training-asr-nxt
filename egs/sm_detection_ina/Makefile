@@ -12,6 +12,7 @@ corpus_dir?=./test
 output_dir?=./.data
 cache_dir=./../../.cache
 runner?=../../runner/target/release/runner
+zipper?=../../runner/target/release/zipper
 workers?=4
 minimum_memory?=10GB
 RUST_LOG?=trace
@@ -30,5 +31,9 @@ run/runner: | $(output_dir)  $(cache_dir)
 		--output-file audio.ina_segments --extensions wav --minimum-memory $(minimum_memory) \
 		--same-dir --cache-file $(cache_dir)/.sm.cache
 .PHONY: run/runner	
+
+backup/res: 
+	$(zipper) --input $(output_dir) --output-file ina_segments.zip --names="audio.ina_segments"
+.PHONY: run/runner
 
 .EXPORT_ALL_VARIABLES:
