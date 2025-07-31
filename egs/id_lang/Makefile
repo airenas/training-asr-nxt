@@ -38,8 +38,12 @@ run/runner/file: | $(output_dir)  $(cache_dir)
 run/runner/speaker: | $(output_dir)  $(cache_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/id_speaker.py --input {input} --output {output}" \
-		--output-file lang_detect_speaker.jsonl --extensions wav --minimum-memory $(minimum_memory) \
+		--output-file lang_detect_speaker.jsonl --extensions wav,audio.rttm --minimum-memory $(minimum_memory) \
 		--same-dir --cache-file $(cache_dir)/.language.speaker.cache
 .PHONY: run/runner/speaker	
+
+backup/res: 
+	$(zipper) --input $(output_dir) --output-file lang.zip --names="lang_detect_speaker.jsonl"
+.PHONY: backup/res
 
 .EXPORT_ALL_VARIABLES:

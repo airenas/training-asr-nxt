@@ -29,7 +29,11 @@ dwn/rttm: | ../../.backup/
 
 dwn/speaker.embeddings: | ../../.backup/
 	scp -P $(port) $(user)@$(server):~/train-asr/egs/speaker_embeddings/speaker.embeddings.zip ../../.backup/
-.PHONY: dwn/speaker_embeddings
+.PHONY: dwn/speaker.embeddings
+
+dwn/lang: | ../../.backup/
+	scp -P $(port) $(user)@$(server):~/train-asr/egs/id_lang/lang.zip ../../.backup/
+.PHONY: dwn/lang
 
 ../../.backup/:
 	mkdir -p $@	

@@ -202,8 +202,14 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
             let eta_calculator = eta_calculator.lock().unwrap();
             pb.set_message(
-                get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
-                    + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
+                get_info_str(
+                    true,
+                    eta_calculator.completed() as i32,
+                    skipped,
+                    failed,
+                    eta_calculator.remaining() as i32,
+                    eta_calculator.speed_per_day(),
+                ) + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
             );
         }
         let res = files::run(&params);
@@ -240,8 +246,14 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         let eta = eta_calculator.eta_str();
         let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
         pb.set_message(
-            get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
-                + format!(", ({}), wrk: {}", eta, wrk_str).as_str(),
+            get_info_str(
+                true,
+                eta_calculator.completed() as i32,
+                skipped,
+                failed,
+                eta_calculator.remaining() as i32,
+                eta_calculator.speed_per_day(),
+            ) + format!(", ({}), wrk: {}", eta, wrk_str).as_str(),
         );
         pb.inc(1);
 
@@ -252,7 +264,14 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
                 0.0
             };
             tracing::info!(
-                msg = get_info_str(false, eta_calculator.completed() as i32, skipped, failed),
+                msg = get_info_str(
+                    false,
+                    eta_calculator.completed() as i32,
+                    skipped,
+                    failed,
+                    eta_calculator.remaining() as i32,
+                    eta_calculator.speed_per_day(),
+                ),
                 wrk = wrk_str,
                 eta = eta.as_ref(),
                 all,
@@ -269,12 +288,26 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         let msg = format!(
             "{} - {}",
             Color::Green.bold().paint("Finished"),
-            get_info_str(true, eta_calculator.completed() as i32, skipped, failed)
+            get_info_str(
+                true,
+                eta_calculator.completed() as i32,
+                skipped,
+                failed,
+                eta_calculator.remaining() as i32,
+                eta_calculator.speed_per_day(),
+            )
         );
         pb.finish_with_message(msg);
         if !Term::stderr().is_term() {
             tracing::info!(
-                msg = get_info_str(false, eta_calculator.completed() as i32, skipped, failed),
+                msg = get_info_str(
+                    false,
+                    eta_calculator.completed() as i32,
+                    skipped,
+                    failed,
+                    eta_calculator.remaining() as i32,
+                    eta_calculator.speed_per_day(),
+                ),
                 all = pb.length(),
                 "Finished",
             );
@@ -285,12 +318,21 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_info_str(use_color: bool, ok: i32, skipped: i32, failed: i32) -> String {
+fn get_info_str(
+    use_color: bool,
+    ok: i32,
+    skipped: i32,
+    failed: i32,
+    rem: i32,
+    speed: f32,
+) -> String {
     format!(
-        "done: {}, skipped: {}, failed: {}",
+        "done: {}, skipped: {}, failed: {}, rem: {}, speed/d: {:.1}",
         paint(use_color, Color::Green, ok),
         paint(use_color, Color::Yellow, skipped),
-        paint(use_color, Color::Red, failed)
+        paint(use_color, Color::Red, failed),
+        paint(use_color, Color::Green, rem),
+        speed,
     )
 }
 

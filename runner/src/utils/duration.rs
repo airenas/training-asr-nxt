@@ -93,13 +93,27 @@ impl ETACalculator {
             return Cow::Borrowed("--");
         }
         // Cow::Owned(format_duration_most_significant(eta))
-        Cow::Owned(format!("{}-{}", format_duration_most_significant(eta), self.durations.data.len()))
+        Cow::Owned(format!(
+            "{}-{}",
+            format_duration_most_significant(eta),
+            self.durations.data.len()
+        ))
     }
     pub fn completed(&self) -> usize {
         self.completed
     }
     pub fn total(&self) -> usize {
         self.total
+    }
+    pub fn remaining(&self) -> usize {
+        self.total - self.completed
+    }
+    pub fn speed_per_day(&self) -> f32 {
+        let avg = self.durations.average();
+        if avg.as_secs() == 0 {
+            return 0.0;
+        }
+        86400 as f32 / avg.as_secs_f32()
     }
     pub fn progress(&self) -> f32 {
         if self.total == 0 {
