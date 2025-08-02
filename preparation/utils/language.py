@@ -1,3 +1,5 @@
+import os
+
 import torchaudio
 
 from preparation.logger import logger
@@ -52,12 +54,22 @@ def detect_lang(language_id, audio_buffer):
         return None, 0.0
 
 
+def get_device_str() -> str:
+    val = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if val is not None and val == "":
+        return "cpu"
+    return "cuda"
+
+
 def detect_language(audio_path, segments):
     from speechbrain.inference.classifiers import EncoderClassifier
+    device = get_device_str()
+    logger.debug(f"Device {device}")
 
     language_id = EncoderClassifier.from_hparams(
         source="speechbrain/lang-id-voxlingua107-ecapa",
-        savedir="tmp/lang-id"
+        savedir="tmp/lang-id",
+        run_opts = {"device": device}
     )
 
     waveform, sample_rate = torchaudio.load(audio_path)

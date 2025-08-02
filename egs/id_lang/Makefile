@@ -4,7 +4,7 @@
 log?=INFO
 python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
 # CUDA?=cuda:0
-CUDA_VISIBLE_DEVICES=
+# CUDA_VISIBLE_DEVICES=
 TF_CPP_MIN_LOG_LEVEL=3
 corpus_dir?=./test
 output_dir?=./.data
