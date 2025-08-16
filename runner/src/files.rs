@@ -1,6 +1,6 @@
 use std::{
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Command, Stdio}, sync::{atomic::{AtomicBool, Ordering}, Arc},
 };
 
 use anyhow::{self};
@@ -35,13 +35,20 @@ pub fn collect_files(
         (String::new(), Vec::new())
     };
 
-    let mut files: Vec<PathBuf> = WalkDir::new(in_dir)
+    let mut files: Vec<PathBuf> = WalkDir::new(in_dir).max_open(2)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| check_suffix(e.path(), &suffix))
         .filter(|e| check_extensions(e.path(), &extensions))
-        .map(|e| e.path().canonicalize().ok().unwrap())
+        .filter_map(|e| {
+            e.path()
+                .canonicalize()
+                .map_err(|err| {
+                    tracing::error!("skip {}: {}", e.path().display(), err);
+                })
+                .ok()
+        })
         .collect();
     tracing::debug!(len = files.len(), "Found files in directory");
     files.sort();
@@ -51,7 +58,7 @@ pub fn collect_files(
     Ok(files)
 }
 
-pub fn collect_all_files(in_dir: &str, names: &[String]) -> anyhow::Result<Vec<PathBuf>> {
+pub fn collect_all_files(in_dir: &str, names: &[String], cancel_flag: Arc<AtomicBool>) -> anyhow::Result<Vec<PathBuf>> {
     let l_names = names
         .iter()
         .map(|s| s.trim())
@@ -59,14 +66,46 @@ pub fn collect_all_files(in_dir: &str, names: &[String]) -> anyhow::Result<Vec<P
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
-    let mut files: Vec<PathBuf> = WalkDir::new(in_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| has_name(e.path(), &l_names))
-        .map(|e| e.path().canonicalize().ok().unwrap())
-        .collect();
-    tracing::debug!(len = files.len(), "Found files in directory");
+    let mut raw_files = Vec::new();
+    for entry in WalkDir::new(in_dir).max_open(2) {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(err) => {
+                tracing::error!("walk error: {}", err);
+                continue;
+            }
+        };
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if !has_name(entry.path(), &l_names) {
+            continue;
+        }
+        raw_files.push(entry.path().to_path_buf());
+        if cancel_flag.load(Ordering::SeqCst) {
+            return Err(anyhow::anyhow!("Zipping cancelled by user"));
+        }
+    }
+
+    tracing::info!(len = raw_files.len(), "total matching files");
+    let mut files = Vec::with_capacity(raw_files.len());
+    for entry in raw_files {
+        match entry.canonicalize() {
+            Ok(path) => files.push(path),
+            Err(err) => tracing::error!("skip {}: {}", entry.display(), err),
+        }
+        if cancel_flag.load(Ordering::SeqCst) {
+            return Err(anyhow::anyhow!("Zipping cancelled by user"));
+        }
+    }
+
+    for n in &l_names {
+        tracing::info!(
+            suffix = n,
+            count = files.iter().filter(|f| check_suffix(f, n)).count(),
+            "with suffix"
+        );
+    }
     files.sort();
     tracing::debug!("Sorted");
 

@@ -69,7 +69,9 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     });
 
     tracing::info!("collecting files");
-    let files = runner::files::collect_all_files(&args.input, &args.names)?;
+     let cancel_flag_clone = cancel_flag.clone();
+
+    let files = runner::files::collect_all_files(&args.input, &args.names, cancel_flag_clone)?;
     tracing::info!(len = files.len(), "files collected");
 
     let input_path = PathBuf::from(&args.input)
