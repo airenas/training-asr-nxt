@@ -24,7 +24,7 @@ dwn/ina: | ../../.backup/
 .PHONY: dwn/ina
 
 dwn/rttm: | ../../.backup/
-	scp -P $(port) $(user)@$(server):~/train-asr/egs/diarization/rttm.zip ../../.backup/
+	scp -P $(port) $(user)@$(server):~/train-asr/egs/diarization/rttm.zip ../../.backup/rttm-$$(date +%Y%m%d_%H%M%S).zip
 .PHONY: dwn/rttm
 
 dwn/speaker.embeddings: | ../../.backup/

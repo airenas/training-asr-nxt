@@ -5,7 +5,8 @@ use std::{
 
 use anyhow::{self};
 use path_absolutize::Absolutize;
-use walkdir::WalkDir;
+// use walkdir::WalkDir;
+use jwalk::{WalkDir};
 
 use crate::{
     utils::cache::{load_cache, save_cache},
@@ -35,12 +36,12 @@ pub fn collect_files(
         (String::new(), Vec::new())
     };
 
-    let mut files: Vec<PathBuf> = WalkDir::new(in_dir).max_open(2)
+    let mut files: Vec<PathBuf> = WalkDir::new(in_dir).parallelism(jwalk::Parallelism::Serial)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-        .filter(|e| check_suffix(e.path(), &suffix))
-        .filter(|e| check_extensions(e.path(), &extensions))
+        .filter(|e| check_suffix(&e.path(), &suffix))
+        .filter(|e| check_extensions(&e.path(), &extensions))
         .filter_map(|e| {
             e.path()
                 .canonicalize()
@@ -67,7 +68,7 @@ pub fn collect_all_files(in_dir: &str, names: &[String], cancel_flag: Arc<Atomic
         .collect::<Vec<String>>();
 
     let mut raw_files = Vec::new();
-    for entry in WalkDir::new(in_dir).max_open(2) {
+    for entry in WalkDir::new(in_dir).parallelism(jwalk::Parallelism::Serial) {
         let entry = match entry {
             Ok(e) => e,
             Err(err) => {
@@ -78,7 +79,7 @@ pub fn collect_all_files(in_dir: &str, names: &[String], cancel_flag: Arc<Atomic
         if !entry.file_type().is_file() {
             continue;
         }
-        if !has_name(entry.path(), &l_names) {
+        if !has_name(&entry.path(), &l_names) {
             continue;
         }
         raw_files.push(entry.path().to_path_buf());
@@ -90,8 +91,8 @@ pub fn collect_all_files(in_dir: &str, names: &[String], cancel_flag: Arc<Atomic
     tracing::info!(len = raw_files.len(), "total matching files");
     let mut files = Vec::with_capacity(raw_files.len());
     for entry in raw_files {
-        match entry.canonicalize() {
-            Ok(path) => files.push(path),
+        match entry.absolutize() {
+            Ok(path) => files.push(path.to_path_buf()),
             Err(err) => tracing::error!("skip {}: {}", entry.display(), err),
         }
         if cancel_flag.load(Ordering::SeqCst) {
