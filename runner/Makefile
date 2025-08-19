@@ -11,7 +11,7 @@ run:
 .PHONY: run
 ###############################################################################
 build/local: 
-	cargo build --release --bin runner --bin zipper --bin db-filler
+	cargo build --release --bin runner --bin zipper --bin db-filler --bin file-to-db
 .PHONY: build/local
 ###############################################################################
 run/zipper:
@@ -22,7 +22,12 @@ run/zipper:
 run/filler:
 	RUST_LOG=$(LOG_LEVEL) cargo run --bin db-filler -- --input=./../test --workers $(workers) \
 	--extensions="m4a" --audio-base=./../.calc-data
-.PHONY: run
+.PHONY: run/filler
+###############################################################################
+run/file-to-db:
+	RUST_LOG=$(LOG_LEVEL) cargo run --bin file-to-db -- --workers $(workers) \
+	--names="audio.rttm" --input-base=./../.calc-data
+.PHONY: run/file-to-db
 ###############################################################################
 test/unit:
 	RUST_LOG=DEBUG cargo test --no-fail-fast

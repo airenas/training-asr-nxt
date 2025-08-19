@@ -58,3 +58,7 @@ path = "src/zipper/main.rs"
 [[bin]]
 name = "db-filler"
 path = "src/db_filler/main.rs"
+
+[[bin]]
+name = "file-to-db"
+path = "src/file_to_db/main.rs"

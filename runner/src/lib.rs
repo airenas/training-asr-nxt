@@ -1,5 +1,7 @@
+pub mod data;
 pub mod files;
 pub mod utils;
+pub mod db;
 
 pub const APP_NAME: &str = "runner";
 
