@@ -32,6 +32,7 @@ sysinfo = "0.35"
 bytesize = "2.0"
 zip = "4.3"
 jwalk = "0.8"
+crossbeam-channel = "0.5.15"
 
 [dev-dependencies]
 tracing-test = "0.2"
