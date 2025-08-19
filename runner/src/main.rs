@@ -1,7 +1,8 @@
 use std::{
     env,
+    path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -12,14 +13,14 @@ use ansi_term::Color;
 use bytesize::ByteSize;
 use clap::Parser;
 use console::Term;
+use crossbeam_channel::{bounded, select, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use runner::{files, APP_NAME};
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 use tokio::signal::unix::{signal, SignalKind};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(version = env!("CARGO_APP_VERSION"), name = APP_NAME, about="Data ETl (just files) pipelines runner", 
     long_about = None, author="Airenas V.<airenass@gmail.com>")]
 struct Args {
@@ -91,8 +92,9 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         .num_threads(args.workers as usize)
         .build_global()?;
 
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    let cancel_flag_clone = cancel_flag.clone();
+    // let cancel_flag = Arc::new(AtomicBool::new(false));
+    // let cancel_flag_clone = cancel_flag.clone();
+    let (cancel_tx, cancel_rx) = bounded::<()>(2);
 
     tokio::spawn(async move {
         let mut int_stream = signal(SignalKind::interrupt()).unwrap();
@@ -102,7 +104,10 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             _ = term_stream.recv() => tracing::info!("Exit event term"),
         }
         tracing::debug!("sending exit event");
-        cancel_flag_clone.store(true, Ordering::SeqCst);
+        // cancel_flag_clone.store(true, Ordering::SeqCst);
+        if let Err(e) = cancel_tx.send(()) {
+            tracing::error!("Failed to send cancel signal: {}", e);
+        }
     });
 
     tracing::info!("collecting files");
@@ -129,156 +134,209 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let active_workers = Arc::new(AtomicUsize::new(0));
     let last_worker_time = Arc::new(Mutex::new(Instant::now()));
 
-    // Process files in parallel using rayon
-    files.par_iter().for_each(|file| {
-        // files.iter().for_each(|file| {
-        let active_workers = active_workers.clone();
+    let (tx, rx): (Sender<PathBuf>, Receiver<PathBuf>) = bounded(0);
 
-        let mut sys = System::new_with_specifics(
-            RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()),
-        );
-
-        let mut mem_waiting = args.slow_start;
-        let mut sleep = false;
-
-        loop {
-            if cancel_flag.load(Ordering::SeqCst) {
-                return;
-            }
-            if sleep {
-                thread::sleep(Duration::from_secs(10));
-            }
-            sys.refresh_memory();
-            let available_memory_mb = sys.available_memory() / (1024 * 1024);
-            if available_memory_mb < memory_threshold_mb {
-                tracing::trace!(
-                    "Low memory: {}MB available. Wanted {}MB. Workers({}/{})",
-                    available_memory_mb,
-                    memory_threshold_mb,
-                    active_workers.load(Ordering::SeqCst),
-                    args.workers,
-                );
-                mem_waiting = true;
-                sleep = true;
-            } else {
-                if mem_waiting {
-                    let mut last_time = last_worker_time.lock().unwrap();
-                    let elapsed = last_time.elapsed();
-                    if elapsed < Duration::from_secs(10) {
-                        tracing::trace!("Worker waiting");
-                        sleep = true;
-                        continue;
+    // producer
+    thread::spawn({
+        let cancel_rx = cancel_rx.clone();
+        move || {
+            for f in files {
+                select! {
+                        send(tx, f) -> res => {
+                    if res.is_err() {
+                        break;
                     }
-                    *last_time = Instant::now();
                 }
-                break;
+                        recv(cancel_rx) -> _ => {
+                        break;
+                    }
+                    }
             }
-        }
-
-        {
-            let mut last_time = last_worker_time.lock().unwrap();
-            *last_time = Instant::now();
-        }
-
-        if cancel_flag.load(Ordering::SeqCst) {
-            return;
-        }
-
-        let params = runner::Params {
-            input_dir: &args.input,
-            output_dir: &args.output,
-            file_name: file.to_str().unwrap(),
-            cmd: &args.cmd,
-            result_file_name: &args.output_file,
-            same_dir: args.same_dir,
-        };
-
-        tracing::debug!(file = file.display().to_string());
-        active_workers.fetch_add(1, Ordering::SeqCst);
-        {
-            let pb = progress.lock().unwrap();
-            let skipped = *skipped_count.lock().unwrap();
-            let failed = *failed_count.lock().unwrap();
-            let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
-            let eta_calculator = eta_calculator.lock().unwrap();
-            pb.set_message(
-                get_info_str(
-                    true,
-                    eta_calculator.completed() as i32,
-                    skipped,
-                    failed,
-                    eta_calculator.remaining() as i32,
-                    eta_calculator.speed_per_day(),
-                ) + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
-            );
-        }
-        let res = files::run(&params);
-        active_workers.fetch_sub(1, Ordering::SeqCst);
-
-        match res {
-            Ok(runner::ProcessStatus::Success) => {
-                let mut eta = eta_calculator.lock().unwrap();
-                eta.add_completed_with_duration();
-            }
-            Ok(runner::ProcessStatus::Skipped) => {
-                let mut skipped = skipped_count.lock().unwrap();
-                *skipped += 1;
-                let mut eta = eta_calculator.lock().unwrap();
-                eta.add_completed();
-            }
-            Err(err) => {
-                let mut failed = failed_count.lock().unwrap();
-                *failed += 1;
-                let mut eta = eta_calculator.lock().unwrap();
-                eta.add_completed_with_duration();
-                tracing::error!(
-                    file = file.display().to_string(),
-                    err = %err,
-                    "Error processing file"
-                );
-            }
-        }
-        let pb = progress.lock().unwrap();
-        let skipped = *skipped_count.lock().unwrap();
-        let failed = *failed_count.lock().unwrap();
-        let all = pb.length().unwrap_or_default();
-        let eta_calculator = eta_calculator.lock().unwrap();
-        let eta = eta_calculator.eta_str();
-        let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
-        pb.set_message(
-            get_info_str(
-                true,
-                eta_calculator.completed() as i32,
-                skipped,
-                failed,
-                eta_calculator.remaining() as i32,
-                eta_calculator.speed_per_day(),
-            ) + format!(", ({}), wrk: {}", eta, wrk_str).as_str(),
-        );
-        pb.inc(1);
-
-        if !Term::stderr().is_term() {
-            let prc = if all > 0 {
-                (pb.position() as f32 / all as f32) * 100.0
-            } else {
-                0.0
-            };
-            tracing::info!(
-                msg = get_info_str(
-                    false,
-                    eta_calculator.completed() as i32,
-                    skipped,
-                    failed,
-                    eta_calculator.remaining() as i32,
-                    eta_calculator.speed_per_day(),
-                ),
-                wrk = wrk_str,
-                eta = eta.as_ref(),
-                all,
-                "%" = format!("{:.2}", prc),
-            );
+            tracing::info!("Snder exit");
         }
     });
+
+    let mut handles: Vec<thread::JoinHandle<Result<u16, anyhow::Error>>> = Vec::new();
+
+    for i in 0..args.workers {
+        tracing::info!(i, "Starting worker");
+        let rx = rx.clone();
+        let progress = progress.clone();
+        let failed_count = failed_count.clone();
+        let skipped_count = skipped_count.clone();
+        let eta_calculator = eta_calculator.clone();
+        let active_workers = active_workers.clone();
+        let last_worker_time = last_worker_time.clone();
+        let args = args.clone();
+        let worker_index = i;
+        let cancel_rx = cancel_rx.clone();
+
+        handles.push(thread::spawn(move || {
+            for file in rx.iter() {
+                let active_workers = active_workers.clone();
+
+                let mut sys = System::new_with_specifics(
+                    RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()),
+                );
+
+                let mut mem_waiting = args.slow_start;
+                let mut sleep = false;
+
+                loop {
+                    if cancel_rx.try_recv().is_ok() {
+                        return Ok(worker_index);
+                    }
+                    if sleep {
+                        thread::sleep(Duration::from_secs(10));
+                    }
+                    sys.refresh_memory();
+                    let available_memory_mb = sys.available_memory() / (1024 * 1024);
+                    if available_memory_mb < memory_threshold_mb {
+                        tracing::trace!(
+                            "Low memory: {}MB available. Wanted {}MB. Workers({}/{})",
+                            available_memory_mb,
+                            memory_threshold_mb,
+                            active_workers.load(Ordering::SeqCst),
+                            args.workers,
+                        );
+                        mem_waiting = true;
+                        sleep = true;
+                    } else {
+                        if mem_waiting {
+                            let mut last_time = last_worker_time.lock().unwrap();
+                            let elapsed = last_time.elapsed();
+                            if elapsed < Duration::from_secs(10) {
+                                tracing::trace!("Worker waiting");
+                                sleep = true;
+                                continue;
+                            }
+                            *last_time = Instant::now();
+                        }
+                        break;
+                    }
+                }
+
+                {
+                    let mut last_time = last_worker_time.lock().unwrap();
+                    *last_time = Instant::now();
+                }
+
+                if cancel_rx.try_recv().is_ok() {
+                    return Ok(worker_index);
+                }
+
+                let params = runner::Params {
+                    input_dir: &args.input,
+                    output_dir: &args.output,
+                    file_name: file.to_str().unwrap(),
+                    cmd: &args.cmd,
+                    result_file_name: &args.output_file,
+                    same_dir: args.same_dir,
+                };
+
+                tracing::debug!(file = file.display().to_string());
+                active_workers.fetch_add(1, Ordering::SeqCst);
+                {
+                    let pb = progress.lock().unwrap();
+                    let skipped = *skipped_count.lock().unwrap();
+                    let failed = *failed_count.lock().unwrap();
+                    let wrk_str =
+                        format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
+                    let eta_calculator = eta_calculator.lock().unwrap();
+                    pb.set_message(
+                        get_info_str(
+                            true,
+                            eta_calculator.completed() as i32,
+                            skipped,
+                            failed,
+                            eta_calculator.remaining() as i32,
+                            eta_calculator.speed_per_day(),
+                        ) + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
+                    );
+                }
+                let res = files::run(&params);
+                active_workers.fetch_sub(1, Ordering::SeqCst);
+
+                match res {
+                    Ok(runner::ProcessStatus::Success) => {
+                        let mut eta = eta_calculator.lock().unwrap();
+                        eta.add_completed_with_duration();
+                    }
+                    Ok(runner::ProcessStatus::Skipped) => {
+                        let mut skipped = skipped_count.lock().unwrap();
+                        *skipped += 1;
+                        let mut eta = eta_calculator.lock().unwrap();
+                        eta.add_completed();
+                    }
+                    Err(err) => {
+                        let mut failed = failed_count.lock().unwrap();
+                        *failed += 1;
+                        let mut eta = eta_calculator.lock().unwrap();
+                        eta.add_completed_with_duration();
+                        tracing::error!(
+                            file = file.display().to_string(),
+                            err = %err,
+                            "Error processing file"
+                        );
+                    }
+                }
+                let pb = progress.lock().unwrap();
+                let skipped = *skipped_count.lock().unwrap();
+                let failed = *failed_count.lock().unwrap();
+                let all = pb.length().unwrap_or_default();
+                let eta_calculator = eta_calculator.lock().unwrap();
+                let eta = eta_calculator.eta_str();
+                let wrk_str = format!("{}/{}", active_workers.load(Ordering::SeqCst), args.workers);
+                pb.set_message(
+                    get_info_str(
+                        true,
+                        eta_calculator.completed() as i32,
+                        skipped,
+                        failed,
+                        eta_calculator.remaining() as i32,
+                        eta_calculator.speed_per_day(),
+                    ) + format!(", ({}), wrk: {}", eta, wrk_str).as_str(),
+                );
+                pb.inc(1);
+
+                if !Term::stderr().is_term() {
+                    let prc = if all > 0 {
+                        (pb.position() as f32 / all as f32) * 100.0
+                    } else {
+                        0.0
+                    };
+                    tracing::info!(
+                        msg = get_info_str(
+                            false,
+                            eta_calculator.completed() as i32,
+                            skipped,
+                            failed,
+                            eta_calculator.remaining() as i32,
+                            eta_calculator.speed_per_day(),
+                        ),
+                        wrk = wrk_str,
+                        eta = eta.as_ref(),
+                        all,
+                        "%" = format!("{:.2}", prc),
+                    );
+                }
+            }
+            Ok(worker_index)
+        }));
+    }
+
+    for h in handles {
+        let join_res = h.join();
+        match join_res {
+            Ok(res) => match res {
+                Ok(index) => tracing::info!("Worker {} finished", index),
+                Err(e) => tracing::error!("Worker thread error: {:?}", e),
+            },
+            Err(e) => {
+                tracing::error!("Failed to join thread: {:?}", e);
+            }
+        }
+    }
 
     {
         let pb = progress.lock().unwrap();
