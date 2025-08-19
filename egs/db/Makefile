@@ -7,6 +7,8 @@ BACKUP_FILE=$(BACKUP_DIR)/metadata_$(shell date +%Y%m%d_%H%M%S).dump
 DB_NAME=metadata
 PSQL_USER=user
 workers?=4
+file?=audio.ina_segments
+file-to-db?=../../runner/target/release/file-to-db
 ########################################################################################################
 ## print usage information
 help:
@@ -20,6 +22,10 @@ run:
 ########################################################################################################
 run/filler: 
 	$(filler) --input=$(corpus_dir) --workers=$(workers) --audio-base=$(output_dir) --extensions=m4a
+.PHONY: run/runner
+########################################################################################################
+run/to-db: 
+	$(file-to-db) --workers=$(workers) --input-base=$(output_dir) --names=$(file)
 .PHONY: run/runner	
 ########################################################################################################
 clean:

@@ -33,7 +33,7 @@ pub fn collect_files(
 }
 
 pub fn save(
-    mut conn: r2d2::PooledConnection<PostgresConnectionManager<NoTls>>,
+    conn: &mut r2d2::PooledConnection<PostgresConnectionManager<NoTls>>,
     file_data: crate::data::structs::File,
 ) -> anyhow::Result<()> {
     tracing::debug!(file = file_data.id, "Saving file to database");
@@ -45,8 +45,22 @@ pub fn save(
     Ok(())
 }
 
+pub fn exists(
+    conn: &mut r2d2::PooledConnection<PostgresConnectionManager<NoTls>>,
+    id: &str,
+    type_: &str,
+) -> anyhow::Result<bool> {
+    tracing::debug!(file = id, type = type_, "Check file in database");
+    let row = conn.query_one(
+        "SELECT EXISTS(SELECT 1 FROM kv WHERE id = $1 AND type = $2)",
+        &[&id, &type_],
+    )?;
+    let exists: bool = row.get(0);
+    Ok(exists)
+}
+
 pub fn load(
-    mut conn: r2d2::PooledConnection<PostgresConnectionManager<NoTls>>,
+    conn: &mut r2d2::PooledConnection<PostgresConnectionManager<NoTls>>,
     id: &str,
     type_: &str,
 ) -> anyhow::Result<crate::data::structs::File> {

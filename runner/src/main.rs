@@ -1,6 +1,5 @@
 use std::{
     env,
-    path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
@@ -13,11 +12,18 @@ use ansi_term::Color;
 use bytesize::ByteSize;
 use clap::Parser;
 use console::Term;
-use crossbeam_channel::{bounded, select, Receiver, Sender};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
-use runner::{files, APP_NAME};
+use postgres::NoTls;
+use r2d2::Pool;
+use r2d2_postgres::PostgresConnectionManager;
+use runner::{
+    data::structs::FileMeta,
+    files,
+    utils::system::{join_threads, setup_send_files, setup_signal_handlers},
+    APP_NAME,
+};
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
-use tokio::signal::unix::{signal, SignalKind};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug, Clone)]
@@ -27,33 +33,27 @@ struct Args {
     /// Workers
     #[arg(long, env, default_value = "12")]
     workers: u16,
-    /// Input dir
+    /// Input base dir
     #[arg(long, env, default_value = "./input")]
-    input: String,
-    /// Output dir
-    #[arg(long, env, default_value = "./output")]
-    output: String,
+    input_base: String,
     /// Output file
-    #[arg(long, env, default_value = "audio.segments")]
-    output_file: String,
+    #[arg(long, env, value_delimiter = ',', default_value = "")]
+    output_files: Vec<String>,
     /// Command
     #[arg(long, env, default_value = "")]
     cmd: String,
-    //Extensions for input files. After comman other required files in the ssame dir wanted
+    //Input files
     #[arg(long, env, value_delimiter = ',', default_value = "")]
-    extensions: Vec<String>,
+    input_files: Vec<String>,
     /// Minimum Memory on the system to be available start new worker
     #[arg(long, env, default_value = "10G",value_parser = parse_bytesize)]
     minimum_memory: ByteSize,
-    /// Output in the same dir as input - do not create new dir
-    #[arg(long, env, default_value = "false")]
-    same_dir: bool,
     /// Slow start - start workers one by one
     #[arg(long, env, default_value = "false")]
     slow_start: bool,
-    /// Cache file
-    #[arg(long, env, default_value = ".runner.file.cache")]
-    cache_file: String,
+    /// Database URL
+    #[arg(long, env, value_delimiter = ',', default_value = "")]
+    db_url: String,
 }
 
 fn parse_bytesize(s: &str) -> Result<ByteSize, String> {
@@ -67,44 +67,40 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::Layer::default().compact())
         .init();
     let args = Args::parse();
-    if let Err(e) = main_int(args).await {
-        tracing::error!("{}", e);
-        return Err(e);
-    }
-    Ok(())
+    tokio::task::spawn_blocking(move || {
+        if let Err(e) = main_int(args) {
+            tracing::error!("{}", e);
+            return Err(e);
+        }
+        Ok(())
+    })
+    .await?
 }
 
-async fn main_int(args: Args) -> anyhow::Result<()> {
+fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(name = APP_NAME, "Starting runner");
     tracing::info!(version = env!("CARGO_APP_VERSION"));
     tracing::info!(workers = args.workers);
-    tracing::info!(input = args.input);
-    tracing::info!(extensions = args.extensions.join(","));
-    tracing::info!(output = args.output);
-    tracing::info!(output_file = args.output_file);
+    tracing::info!(input_base = args.input_base);
+    tracing::info!(input_files = args.input_files.join(","));
+    tracing::info!(output_files = args.output_files.join(","));
     tracing::info!(minimum_memory = args.minimum_memory.to_string());
-    tracing::info!(same_dir = args.same_dir);
     tracing::info!(cmd = args.cmd);
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
 
-    let (cancel_tx, cancel_rx) = bounded::<()>(2);
+    let cancel_rx = setup_signal_handlers();
 
-    tokio::spawn(async move {
-        let mut int_stream = signal(SignalKind::interrupt()).unwrap();
-        let mut term_stream = signal(SignalKind::terminate()).unwrap();
-        tokio::select! {
-            _ = int_stream.recv() => tracing::info!("Exit event int"),
-            _ = term_stream.recv() => tracing::info!("Exit event term"),
-        }
-        tracing::debug!("sending exit event");
-        if let Err(e) = cancel_tx.send(()) {
-            tracing::error!("Failed to send cancel signal: {}", e);
-        }
-    });
+    let manager: PostgresConnectionManager<NoTls> =
+        PostgresConnectionManager::new(args.db_url.as_str().parse()?, NoTls);
+    let pool: Arc<Pool<PostgresConnectionManager<NoTls>>> = Arc::new(
+        Pool::builder()
+            .max_size(args.workers as u32)
+            .build(manager)?,
+    );
 
     tracing::info!("collecting files");
-    let files = runner::files::collect_files(&args.input, &args.extensions, &args.cache_file)?;
+    let files: Vec<runner::data::structs::FileMeta> = runner::db::collect_files(pool.clone())?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = Arc::new(Mutex::new(ProgressBar::new(files.len() as u64)));
@@ -127,27 +123,9 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let active_workers = Arc::new(AtomicUsize::new(0));
     let last_worker_time = Arc::new(Mutex::new(Instant::now()));
 
-    let (tx, rx): (Sender<PathBuf>, Receiver<PathBuf>) = bounded(0);
+    let (tx, rx): (Sender<FileMeta>, Receiver<FileMeta>) = bounded(0);
 
-    // producer
-    thread::spawn({
-        let cancel_rx = cancel_rx.clone();
-        move || {
-            for f in files {
-                select! {
-                        send(tx, f) -> res => {
-                    if res.is_err() {
-                        break;
-                    }
-                }
-                        recv(cancel_rx) -> _ => {
-                        break;
-                    }
-                    }
-            }
-            tracing::info!("Snder exit");
-        }
-    });
+    setup_send_files(files, tx, cancel_rx.clone())?;
 
     let mut handles: Vec<thread::JoinHandle<Result<u16, anyhow::Error>>> = Vec::new();
 
@@ -163,6 +141,9 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         let args = args.clone();
         let worker_index = i;
         let cancel_rx = cancel_rx.clone();
+        let input_files = args.input_files.clone();
+        let output_files = args.output_files.clone();
+        let pool = pool.clone();
 
         handles.push(thread::spawn(move || {
             for file in rx.iter() {
@@ -219,15 +200,16 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
                 }
 
                 let params = runner::Params {
-                    input_dir: &args.input,
-                    output_dir: &args.output,
-                    file_name: file.to_str().unwrap(),
+                    worker_index,
                     cmd: &args.cmd,
-                    result_file_name: &args.output_file,
-                    same_dir: args.same_dir,
+                    input_base_dir: &args.input_base,
+                    input_files: &input_files,
+                    output_files: &output_files,
+                    file_meta: &file,
+                    pool: pool.clone(),
                 };
 
-                tracing::debug!(file = file.display().to_string());
+                tracing::debug!(file = file.path);
                 active_workers.fetch_add(1, Ordering::SeqCst);
                 {
                     let pb = progress.lock().unwrap();
@@ -267,7 +249,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
                         let mut eta = eta_calculator.lock().unwrap();
                         eta.add_completed_with_duration();
                         tracing::error!(
-                            file = file.display().to_string(),
+                            file = file.path,
                             err = %err,
                             "Error processing file"
                         );
@@ -318,18 +300,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         }));
     }
 
-    for h in handles {
-        let join_res = h.join();
-        match join_res {
-            Ok(res) => match res {
-                Ok(index) => tracing::info!("Worker {} finished", index),
-                Err(e) => tracing::error!("Worker thread error: {:?}", e),
-            },
-            Err(e) => {
-                tracing::error!("Failed to join thread: {:?}", e);
-            }
-        }
-    }
+    join_threads(handles)?;
 
     {
         let pb = progress.lock().unwrap();

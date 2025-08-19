@@ -5,14 +5,18 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use anyhow::{self};
 use path_absolutize::Absolutize;
 // use walkdir::WalkDir;
 use jwalk::WalkDir;
+use tempfile::TempDir;
 
 use crate::{
+    data::structs::File,
+    db::{self, exists, load},
     utils::cache::{load_cache, save_cache},
     Params, ProcessStatus,
 };
@@ -169,48 +173,81 @@ fn check_extensions(e: &Path, extensions: &[String]) -> bool {
 }
 
 pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
-    let output_file = get_cache_file_name(
-        params.file_name,
-        params.input_dir,
-        params.output_dir,
-        params.result_file_name,
-        params.same_dir,
-    )?;
-    tracing::trace!(file = params.file_name, out = output_file.to_str());
-    if output_file.exists() {
-        tracing::trace!(file = output_file.to_str(), "File already exists");
-        return Ok(ProcessStatus::Skipped);
+    tracing::trace!(file = params.file_meta.path);
+
+    if params.input_files.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No input files found, skipping command execution"
+        ));
     }
-    // create directory if it does not exist
-    if let Some(parent) = output_file.parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-            tracing::trace!(file = parent.to_str(), "Directory created");
+
+    if params.output_files.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No output files specified, skipping command execution"
+        ));
+    }
+
+    let mut conn = params.pool.get_timeout(Duration::from_secs(10))?;
+    if let Some(file) = params.output_files.first() {
+        if exists(&mut conn, &params.file_meta.id, file)? {
+            tracing::trace!(file = file, "File already exists");
+            return Ok(ProcessStatus::Skipped);
         }
     }
-    let res_tmp = run_cmd(params.cmd, params.input_dir, &output_file, params.file_name)?;
 
-    tracing::trace!(file = params.file_name, out = res_tmp, "Command finished");
-    let res = std::fs::rename(res_tmp, &output_file);
-    if let Err(e) = res {
-        tracing::error!(
-            file = params.file_name,
-            out = output_file.to_str(),
-            "Error renaming file"
-        );
-        return Err(anyhow::anyhow!("Error renaming file: {}", e));
+    let dir = TempDir::new()?;
+
+    for file in params.input_files.iter() {
+        let file_name = dir.path().join(file);
+        let data = load(&mut conn, &params.file_meta.id, file)?;
+        std::fs::write(file_name, data.data)?;
     }
-    tracing::trace!(
-        file = params.file_name,
-        out = output_file.to_str(),
-        "File renamed"
-    );
+
+    drop(conn);
+
+    let input_file = dir.path().join(params.output_files[0].as_str());
+    let output_file = dir.path().join(params.output_files[0].as_str());
+
+    let res = run_cmd(
+        params.cmd,
+        params.input_base_dir,
+        &input_file,
+        &output_file,
+        &params.file_meta.path,
+    )?;
+
+    tracing::trace!(file = params.file_meta.path, out = res, "Command finished");
+
+    let mut conn = params.pool.get_timeout(Duration::from_secs(10))?;
+
+    for (idx, file) in params.output_files.iter().enumerate() {
+        let file_name = dir.path().join(file);
+        let data = std::fs::read(file_name);
+        match data {
+            Ok(data) => {
+                let file_data = File {
+                    id: params.file_meta.id.clone(),
+                    type_: file.to_string(),
+                    data,
+                };
+                db::save(&mut conn, file_data)?;
+            }
+            Err(e) => {
+                if idx == 0 {
+                    return Err(anyhow::anyhow!("Failed to read input file: {}", e));
+                }
+                tracing::warn!(file = file, "Failed to read output file: {}", e);
+            }
+        }
+    }
+
     Ok(ProcessStatus::Success)
 }
 
 fn run_cmd(
     cmd: &str,
-    _input_dir: &str,
+    input_base_dir: &str,
+    input_file: &Path,
     output_file: &Path,
     file_name: &str,
 ) -> anyhow::Result<String> {
@@ -218,13 +255,14 @@ fn run_cmd(
         return Err(anyhow::anyhow!("Command does not contain placeholders"));
     }
 
-    let output_tmp_file = format!("{}.{}", output_file.to_str().unwrap(), "tmp");
+    let audio_wav = make_audio_name(input_base_dir, file_name);
 
     let parts = cmd.split_whitespace();
     let parts: Vec<String> = parts
         .map(|part| {
-            part.replace("{input}", file_name)
-                .replace("{output}", output_tmp_file.as_str())
+            part.replace("{input}", input_file.to_string_lossy().as_ref())
+                .replace("{input_wav}", audio_wav.to_string_lossy().as_ref())
+                .replace("{output}", output_file.to_string_lossy().as_ref())
         })
         .collect();
 
@@ -256,7 +294,7 @@ fn run_cmd(
         ));
     }
 
-    Ok(output_tmp_file)
+    Ok(output_file.to_string_lossy().to_string())
 }
 
 fn get_cache_file_name(
@@ -296,6 +334,10 @@ pub fn save(data: Vec<u8>, file_name: String) -> anyhow::Result<()> {
     }
     std::fs::write(path, data)?;
     Ok(())
+}
+
+pub fn make_audio_name(audio_base: &str, path: &str) -> PathBuf {
+    PathBuf::from(audio_base).join(path).join("audio.16.wav")
 }
 
 #[cfg(test)]

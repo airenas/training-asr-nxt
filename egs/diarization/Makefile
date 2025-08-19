@@ -35,10 +35,9 @@ run: | $(output_dir)
 .PHONY: run	
 
 run/runner: | $(output_dir) $(cache_dir)
-	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
-		--cmd "python local/pyannote.py --input {input} --output {output}" \
-		--output-file audio.rttm --extensions wav,audio.ina_segments --minimum-memory $(minimum_memory) \
-		--same-dir --cache-file $(cache_dir)/.diarization.cache
+	$(runner) --input-base $(output_dir) --workers $(workers) \
+		--cmd "python local/pyannote.py --input {input_wav} --input_segments {input} --output {output}" \
+		--output-files=audio.rttm,speech.rttm --input-files=audio.ina_segments --minimum-memory $(minimum_memory)
 .PHONY: run/runner	
 
 run/runner/grid: | $(output_dir) $(cache_dir)

@@ -10,10 +10,10 @@ use anyhow::Context;
 use clap::Parser;
 use crossbeam_channel::{bounded, select, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
-use runner::APP_NAME;
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
+use runner::{
+    files::make_audio_name,
+    utils::system::{join_threads, setup_signal_handlers},
+    APP_NAME,
 };
 use symphonia::{
     core::{io::MediaSourceStream, probe::Hint},
@@ -75,26 +75,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
 
-    let (cancel_tx, cancel_rx) = bounded::<()>(2);
-
-    thread::spawn(move || {
-        let mut signals = Signals::new([SIGINT, SIGTERM]).unwrap();
-        for signal in &mut signals {
-            match signal {
-                SIGINT => {
-                    tracing::info!("Exit event SIGINT");
-                }
-                SIGTERM => {
-                    tracing::info!("Exit event SIGTERM");
-                }
-                _ => {}
-            }
-        }
-        tracing::debug!("sending exit event");
-        if let Err(e) = cancel_tx.send(()) {
-            tracing::error!("Failed to send cancel signal: {}", e);
-        }
-    });
+    let cancel_rx = setup_signal_handlers();
 
     let manager = PostgresConnectionManager::new(args.db_url.as_str().parse()?, NoTls);
     let pool = Arc::new(
@@ -152,7 +133,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         tracing::info!(i, "Starting worker");
         let rx = rx.clone();
         let progress = progress.clone();
-        let worker_index = i;
+        let worker_index: u16 = i;
         let cancel_rx = cancel_rx.clone();
         let pool = pool.clone();
         let input_path = input_path.clone();
@@ -168,11 +149,12 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                 let res: Result<(), anyhow::Error> = (|| {
                     let file_name = get_name(&file, &input_path);
                     tracing::debug!(worker_index, file_name, "Processing file");
-                    let audio_file_name = make_audio_name(&file_name, &audio_base);
+                    let audio_file_name = make_audio_name(&audio_base, &file_name);
 
                     let id = format!("{:x}", md5::compute(&file_name));
                     let duration_in_sec = get_duration(&audio_file_name).context(format!(
-                        "Failed to get audio duration, {}", audio_file_name.display()
+                        "Failed to get audio duration, {}",
+                        audio_file_name.display()
                     ))?;
                     tracing::debug!(file_name, duration_in_sec);
 
@@ -197,31 +179,13 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         }));
     }
 
-    let mut was_err = false;
-
-    for h in handles {
-        let join_res = h.join();
-        match join_res {
-            Ok(res) => match res {
-                Ok(index) => tracing::info!("Worker {} finished", index),
-                Err(e) => {
-                    was_err = true;
-                    tracing::error!("Worker thread error: {:?}", e);
-                }
-            },
-            Err(e) => {
-                was_err = true;
-                tracing::error!("Failed to join thread: {:?}", e);
-            }
-        }
-    }
+    join_threads(handles)?;
 
     tracing::info!("closing connections");
     drop(pool);
 
     let failed = *failed_count.lock().unwrap();
-
-    if was_err || failed > 0 {
+    if failed > 0 {
         progress.lock().unwrap().set_message("Runner failed");
         tracing::warn!(failed, "Runner completed with failures");
     } else {
@@ -233,11 +197,6 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
     tracing::info!("Runner finished");
     Ok(())
-}
-
-fn make_audio_name(file: &str, audio_base: &str) -> PathBuf {
-    let audio_file_name = format!("{file}/audio.16.wav");
-    PathBuf::from(audio_base).join(audio_file_name)
 }
 
 fn get_name(file: &Path, prefix: &str) -> String {

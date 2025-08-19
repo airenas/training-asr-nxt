@@ -7,15 +7,12 @@ use std::{
 };
 
 use clap::Parser;
-use crossbeam_channel::{bounded, select, Receiver, Sender};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use runner::{
     data::structs::{File, FileMeta},
+    utils::system::{join_threads, setup_send_files, setup_signal_handlers},
     APP_NAME,
-};
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -66,26 +63,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
 
-    let (cancel_tx, cancel_rx) = bounded::<()>(2);
-
-    thread::spawn(move || {
-        let mut signals = Signals::new([SIGINT, SIGTERM]).unwrap();
-        for signal in &mut signals {
-            match signal {
-                SIGINT => {
-                    tracing::info!("Exit event SIGINT");
-                }
-                SIGTERM => {
-                    tracing::info!("Exit event SIGTERM");
-                }
-                _ => {}
-            }
-        }
-        tracing::debug!("sending exit event");
-        if let Err(e) = cancel_tx.send(()) {
-            tracing::error!("Failed to send cancel signal: {}", e);
-        }
-    });
+    let cancel_rx = setup_signal_handlers();
 
     let manager: PostgresConnectionManager<NoTls> =
         PostgresConnectionManager::new(args.db_url.as_str().parse()?, NoTls);
@@ -111,25 +89,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
     let (tx, rx): (Sender<FileMeta>, Receiver<FileMeta>) = bounded(0);
 
-    // producer
-    thread::spawn({
-        let cancel_rx = cancel_rx.clone();
-        move || {
-            for f in files {
-                select! {
-                        send(tx, f) -> res => {
-                    if res.is_err() {
-                        break;
-                    }
-                }
-                        recv(cancel_rx) -> _ => {
-                        break;
-                    }
-                    }
-            }
-            tracing::info!("Sender exit");
-        }
-    });
+    setup_send_files(files, tx, cancel_rx.clone())?;
 
     let mut handles: Vec<thread::JoinHandle<Result<u16, anyhow::Error>>> = Vec::new();
     let failed_count = Arc::new(Mutex::new(0));
@@ -163,8 +123,8 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                             data,
                         };
 
-                        let conn = pool.get_timeout(Duration::from_secs(10))?;
-                        runner::db::save(conn, file_data)?;
+                        let mut conn = pool.get_timeout(Duration::from_secs(10))?;
+                        runner::db::save(&mut conn, file_data)?;
 
                         Ok(())
                     })();
@@ -187,31 +147,14 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         }));
     }
 
-    let mut was_err = false;
-
-    for h in handles {
-        let join_res = h.join();
-        match join_res {
-            Ok(res) => match res {
-                Ok(index) => tracing::info!("Worker {} finished", index),
-                Err(e) => {
-                    was_err = true;
-                    tracing::error!("Worker thread error: {:?}", e);
-                }
-            },
-            Err(e) => {
-                was_err = true;
-                tracing::error!("Failed to join thread: {:?}", e);
-            }
-        }
-    }
+    join_threads(handles)?;
 
     tracing::info!("closing connections");
     drop(pool);
 
     let failed = *failed_count.lock().unwrap();
 
-    if was_err || failed > 0 {
+    if failed > 0 {
         progress.lock().unwrap().set_message("Runner failed");
         tracing::warn!(failed, "Runner completed with failures");
     } else {

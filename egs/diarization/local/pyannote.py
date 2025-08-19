@@ -87,15 +87,17 @@ def restore_time(data: Annotation, speech_segments: List[Segment]) -> Annotation
 
 def main(argv):
     logger.info("Starting")
-    parser = argparse.ArgumentParser(description="Runs audio diarizatiopn")
+    parser = argparse.ArgumentParser(description="Runs audio diarization")
     parser.add_argument("--input", nargs='?', required=True, help="File")
+    parser.add_argument("--input_segments", nargs='?', required=True, help="File with segments")
     parser.add_argument("--output", nargs='?', required=True, help="File")
 
     args = parser.parse_args(args=argv)
 
     logger.info(f"Input file   : {args.input}")
+    logger.info(f"Segments file   : {args.input_segments}")
     logger.info(f"Output file  : {args.output}")
-    segments = load_segments(args.input)
+    segments = load_segments(args.input_segments)
     speech_segments = select_speech(segments)
     res = []
     if len(speech_segments) > 0:
