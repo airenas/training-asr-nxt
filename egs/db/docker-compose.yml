@@ -1,0 +1,27 @@
+x-logging-default:
+  &default-logging
+  options:
+    max-size: '20m'
+    max-file: '3'
+  driver: json-file
+
+services:
+  metadata-db:
+    image: postgres:16.10-alpine3.22
+    container_name: metadata-db
+    logging: *default-logging
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./data/db:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=${PSQL_PASS}
+      - POSTGRES_INITDB_ARGS=--auth=password
+      - POSTGRES_DB=metadata
+    ports:
+      - "5432:5432"
+
+volumes:
+  pgdata:      
+  

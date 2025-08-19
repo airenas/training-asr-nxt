@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS files (
+    id VARCHAR(64) NOT NULL,  -- SHA1/MD5 hash of original filename
+    path TEXT NOT NULL,       -- Keep the real filename
+    duration_in_sec DOUBLE PRECISION, 
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS kv (
+    id VARCHAR(64) NOT NULL,      -- SHA1/MD5 hash of original filename
+    type TEXT NOT NULL,                  -- "rttm", "segments", "json", "txt", etc.
+    content BYTEA NOT NULL,              -- File content (binary safe)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    PRIMARY KEY (id, type)
+);
+
