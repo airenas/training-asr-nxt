@@ -17,7 +17,7 @@ pub fn load_cache(cache_file: &str) -> anyhow::Result<Vec<PathBuf>> {
 pub fn save_cache(cache_file: &str, files: &[PathBuf]) -> anyhow::Result<()> {
     let mut file = File::create(cache_file)?;
     for path in files {
-        file.write(format!("{}\n", path.display()).as_bytes())?;
+        let _ = file.write(format!("{}\n", path.display()).as_bytes())?;
     }
     tracing::info!("File list cached to: {}", cache_file);
 

@@ -78,7 +78,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     let (cancel_tx, cancel_rx) = bounded::<()>(2);
 
     thread::spawn(move || {
-        let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
+        let mut signals = Signals::new([SIGINT, SIGTERM]).unwrap();
         for signal in &mut signals {
             match signal {
                 SIGINT => {
@@ -236,11 +236,11 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 }
 
 fn make_audio_name(file: &str, audio_base: &str) -> PathBuf {
-    let audio_file_name = format!("{}/audio.16.wav", file);
+    let audio_file_name = format!("{file}/audio.16.wav");
     PathBuf::from(audio_base).join(audio_file_name)
 }
 
-fn get_name(file: &PathBuf, prefix: &str) -> String {
+fn get_name(file: &Path, prefix: &str) -> String {
     let file_name = file.to_string_lossy().to_string();
     let mut res = file_name.strip_prefix(prefix).unwrap().to_string();
     if res.starts_with("/") {
@@ -254,7 +254,7 @@ fn get_duration(path: &Path) -> anyhow::Result<f64> {
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
     if let Some(ext) = path.extension() {
-        hint.with_extension(&ext.to_string_lossy().into_owned());
+        hint.with_extension(&ext.to_string_lossy());
     }
 
     let probed = get_probe().format(&hint, mss, &Default::default(), &Default::default())?;

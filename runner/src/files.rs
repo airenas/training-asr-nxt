@@ -1,12 +1,16 @@
 use std::{
     path::{Path, PathBuf},
-    process::{Command, Stdio}, sync::{atomic::{AtomicBool, Ordering}, Arc},
+    process::{Command, Stdio},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use anyhow::{self};
 use path_absolutize::Absolutize;
 // use walkdir::WalkDir;
-use jwalk::{WalkDir};
+use jwalk::WalkDir;
 
 use crate::{
     utils::cache::{load_cache, save_cache},
@@ -36,7 +40,8 @@ pub fn collect_files(
         (String::new(), Vec::new())
     };
 
-    let mut files: Vec<PathBuf> = WalkDir::new(in_dir).parallelism(jwalk::Parallelism::Serial)
+    let mut files: Vec<PathBuf> = WalkDir::new(in_dir)
+        .parallelism(jwalk::Parallelism::Serial)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
@@ -59,7 +64,11 @@ pub fn collect_files(
     Ok(files)
 }
 
-pub fn collect_all_files(in_dir: &str, names: &[String], cancel_flag: Arc<AtomicBool>) -> anyhow::Result<Vec<PathBuf>> {
+pub fn collect_all_files(
+    in_dir: &str,
+    names: &[String],
+    cancel_flag: Arc<AtomicBool>,
+) -> anyhow::Result<Vec<PathBuf>> {
     let l_names = names
         .iter()
         .map(|s| s.trim())
@@ -280,6 +289,15 @@ fn get_cache_file_name(
     Ok(cache_file_path)
 }
 
+pub fn save(data: Vec<u8>, file_name: String) -> anyhow::Result<()> {
+    let path = Path::new(&file_name);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, data)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,11 +366,10 @@ mod tests {
 
         for (extensions, file_name, expected) in test_cases {
             let path = std::path::Path::new(file_name);
-            let result = check_suffix(path, &extensions);
+            let result = check_suffix(path, extensions);
             assert_eq!(
                 result, expected,
-                "Failed for extensions: {:?}, file_name: {}",
-                extensions, file_name
+                "Failed for extensions: {extensions:?}, file_name: {file_name}"
             );
         }
     }

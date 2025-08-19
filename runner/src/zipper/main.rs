@@ -95,7 +95,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         FileOptions::default().compression_method(CompressionMethod::Deflated);
 
     for f_name in files.iter() {
-        let mut f = File::open(&f_name)?;
+        let mut f = File::open(f_name)?;
         let mut buffer = Vec::new();
         f.read_to_end(&mut buffer)?;
 

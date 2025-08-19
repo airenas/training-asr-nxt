@@ -29,6 +29,11 @@ run/file-to-db:
 	--names="audio.rttm" --input-base=./../.calc-data
 .PHONY: run/file-to-db
 ###############################################################################
+run/db-to-file:
+	RUST_LOG=$(LOG_LEVEL) cargo run --bin db-to-file -- --workers $(workers) \
+	--names="audio.rttm" --output-base=./../.t1
+.PHONY: run/db-to-file
+###############################################################################
 test/unit:
 	RUST_LOG=DEBUG cargo test --no-fail-fast
 .PHONY: test/unit		

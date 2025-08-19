@@ -113,7 +113,7 @@ impl ETACalculator {
         if avg.as_secs() == 0 {
             return 0.0;
         }
-        86400 as f32 / avg.as_secs_f32()
+        86400_f32 / avg.as_secs_f32()
     }
     pub fn progress(&self) -> f32 {
         if self.total == 0 {
@@ -141,20 +141,20 @@ fn format_duration(dur: Duration) -> String {
     let hours = minutes / 60;
     let days = hours / 24;
     if days > 0 {
-        return format!("{}d{}", days, if_non_zero(hours % 24, "h"));
+        return format!("{days}d{}", if_non_zero(hours % 24, "h"));
     }
     if hours > 0 {
-        return format!("{}h{}", hours, if_non_zero(minutes % 60, "m"));
+        return format!("{hours}h{}", if_non_zero(minutes % 60, "m"));
     }
     if minutes > 0 {
-        return format!("{}m{}", minutes, if_non_zero(secs % 60, "s"));
+        return format!("{minutes}m{}", if_non_zero(secs % 60, "s"));
     }
-    format!("{}s", secs)
+    format!("{secs}s")
 }
 
 fn if_non_zero(v: u64, s: &str) -> Cow<'static, str> {
     if v > 0 {
-        return Cow::Owned(format!(" {}{}", v, s));
+        return Cow::Owned(format!(" {v}{s}"));
     }
     Cow::Borrowed("")
 }

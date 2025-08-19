@@ -1,6 +1,5 @@
 use std::{
     env,
-    path::Path,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -9,10 +8,7 @@ use std::{
 use clap::Parser;
 use crossbeam_channel::{bounded, select, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
-use runner::{
-    data::structs::{File, FileMeta},
-    APP_NAME,
-};
+use runner::{data::structs::FileMeta, APP_NAME};
 use signal_hook::{
     consts::{SIGINT, SIGTERM},
     iterator::Signals,
@@ -32,7 +28,7 @@ struct Args {
     workers: u16,
     /// Input base dir
     #[arg(long, env, default_value = "")]
-    input_base: String,
+    output_base: String,
     /// Names
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     names: Vec<String>,
@@ -61,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
 fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(name = APP_NAME, "Starting db filler");
     tracing::info!(version = env!("CARGO_APP_VERSION"));
-    tracing::info!(input_base = args.input_base);
+    tracing::info!(output_base = args.output_base);
     tracing::info!(names = args.names.join(","));
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
@@ -141,7 +137,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         let worker_index = i;
         let cancel_rx = cancel_rx.clone();
         let pool = pool.clone();
-        let input_base = args.input_base.clone();
+        let output_base = args.output_base.clone();
         let failed_count = failed_count.clone();
         let names = args.names.clone();
 
@@ -153,18 +149,12 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
                 for name in names.iter() {
                     let res: Result<(), anyhow::Error> = (|| {
-                        let file_name = get_name(&file.path, &input_base, name);
+                        let file_name = get_name(&file.path, &output_base, name);
                         tracing::debug!(wrk = worker_index, file = file_name, "Processing file");
-                        let data = load(&file_name)?;
-
-                        let file_data = File {
-                            id: file.id.clone(),
-                            type_: name.clone(),
-                            data,
-                        };
-
                         let conn = pool.get_timeout(Duration::from_secs(10))?;
-                        runner::db::save(conn, file_data)?;
+                        let data = runner::db::load(conn, &file.id, name)?;
+
+                        runner::files::save(data.data, file_name)?;
 
                         Ok(())
                     })();
@@ -223,14 +213,6 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
     tracing::info!("Runner finished");
     Ok(())
-}
-
-fn load(file_name: &str) -> anyhow::Result<Vec<u8>> {
-    let path = Path::new(file_name);
-    if !path.exists() {
-        return Err(anyhow::anyhow!("File not found: {file_name}"));
-    }
-    Ok(std::fs::read(path)?)
 }
 
 fn get_name(path: &str, prefix: &str, name: &str) -> String {

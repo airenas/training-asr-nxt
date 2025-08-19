@@ -288,7 +288,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
                         failed,
                         eta_calculator.remaining() as i32,
                         eta_calculator.speed_per_day(),
-                    ) + format!(", ({}), wrk: {}", eta, wrk_str).as_str(),
+                    ) + format!(", ({eta}), wrk: {wrk_str}").as_str(),
                 );
                 pb.inc(1);
 
@@ -389,7 +389,7 @@ fn get_info_str(
 
 fn paint(use_color: bool, colour: Color, v: i32) -> String {
     if use_color && v > 0 {
-        return colour.bold().paint(format!("{}", v)).to_string();
+        return colour.bold().paint(format!("{v}")).to_string();
     }
-    format!("{}", v)
+    format!("{v}")
 }

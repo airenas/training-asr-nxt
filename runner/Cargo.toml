@@ -62,3 +62,7 @@ path = "src/db_filler/main.rs"
 [[bin]]
 name = "file-to-db"
 path = "src/file_to_db/main.rs"
+
+[[bin]]
+name = "db-to-file"
+path = "src/db_to_file/main.rs"
