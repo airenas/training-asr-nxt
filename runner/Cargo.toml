@@ -33,6 +33,12 @@ bytesize = "2.0"
 zip = "4.3"
 jwalk = "0.8"
 crossbeam-channel = "0.5.15"
+postgres = "0.19"
+r2d2 = "0.8"
+r2d2_postgres = "0.18"
+md5 = "0.8.0"
+symphonia = "0.5.4"
+signal-hook = "0.3.18"
 
 [dev-dependencies]
 tracing-test = "0.2"
@@ -48,3 +54,7 @@ path = "src/main.rs"
 [[bin]]
 name = "zipper"
 path = "src/zipper/main.rs"
+
+[[bin]]
+name = "db-filler"
+path = "src/db_filler/main.rs"

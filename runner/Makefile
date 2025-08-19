@@ -1,7 +1,7 @@
 -include Makefile.options
 workers?=4
 PYTHONPATH=./../
-LOG_LEVEL=info
+LOG_LEVEL?=info
 CUDA_VISIBLE_DEVICES=
 ###############################################################################
 run:
@@ -11,12 +11,17 @@ run:
 .PHONY: run
 ###############################################################################
 build/local: 
-	cargo build --release --bin runner --bin zipper
+	cargo build --release --bin runner --bin zipper --bin db-filler
 .PHONY: build/local
 ###############################################################################
 run/zipper:
 	RUST_LOG=trace cargo run --bin zipper -- --input=../.calc-data --output-file=1.zip \
 	--names="audio.rttm,audio.ina_segments"
+.PHONY: run/zipper
+###############################################################################
+run/filler:
+	RUST_LOG=$(LOG_LEVEL) cargo run --bin db-filler -- --input=./../test --workers $(workers) \
+	--extensions="m4a" --audio-base=./../.calc-data
 .PHONY: run
 ###############################################################################
 test/unit:

@@ -1,8 +1,12 @@
+############################################################
+-include ../../Makefile.options
+############################################################
 include .env
 BACKUP_DIR=./backups
 BACKUP_FILE=$(BACKUP_DIR)/metadata_$(shell date +%Y%m%d_%H%M%S).dump
 DB_NAME=metadata
 PSQL_USER=user
+workers?=4
 ########################################################################################################
 ## print usage information
 help:
@@ -13,6 +17,10 @@ help:
 run:
 	docker compose up -d 
 .PHONY: run
+########################################################################################################
+run/filler: 
+	$(filler) --input=$(corpus_dir) --workers=$(workers) --audio-base=$(output_dir) --extensions=m4a
+.PHONY: run/runner	
 ########################################################################################################
 clean:
 	docker compose down

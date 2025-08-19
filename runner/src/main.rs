@@ -88,12 +88,6 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
 
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(args.workers as usize)
-        .build_global()?;
-
-    // let cancel_flag = Arc::new(AtomicBool::new(false));
-    // let cancel_flag_clone = cancel_flag.clone();
     let (cancel_tx, cancel_rx) = bounded::<()>(2);
 
     tokio::spawn(async move {
@@ -104,7 +98,6 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             _ = term_stream.recv() => tracing::info!("Exit event term"),
         }
         tracing::debug!("sending exit event");
-        // cancel_flag_clone.store(true, Ordering::SeqCst);
         if let Err(e) = cancel_tx.send(()) {
             tracing::error!("Failed to send cancel signal: {}", e);
         }

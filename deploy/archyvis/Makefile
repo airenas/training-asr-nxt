@@ -17,6 +17,7 @@ copy/scripts:
 	scp -P $(port) -r ./remote/*  $(user)@$(server):~/train-asr/
 	scp -P $(port) -r ../../egs  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../runner/target/release/zipper $(user)@$(server):~/train-asr/bin/
+	scp -P $(port) ../../runner/target/release/db-filler $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
 
 dwn/ina: | ../../.backup/
