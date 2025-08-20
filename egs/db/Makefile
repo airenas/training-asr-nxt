@@ -9,6 +9,7 @@ PSQL_USER=user
 workers?=4
 file?=audio.ina_segments
 file-to-db?=../../runner/target/release/file-to-db
+filler?=../../runner/target/release/db-filler
 ########################################################################################################
 ## print usage information
 help:

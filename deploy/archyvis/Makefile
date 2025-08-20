@@ -22,21 +22,11 @@ copy/scripts:
 	scp -P $(port) ../../runner/target/release/db-to-file $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
 
-dwn/ina: | ../../.backup/
-	scp -P $(port) $(user)@$(server):~/train-asr/egs/sm_detection_ina/ina_segments.zip ../../.backup/
-.PHONY: dwn/ina
-
-dwn/rttm: | ../../.backup/
-	scp -P $(port) $(user)@$(server):~/train-asr/egs/diarization/rttm.zip ../../.backup/rttm-$$(date +%Y%m%d_%H%M%S).zip
-.PHONY: dwn/rttm
-
-dwn/speaker.embeddings: | ../../.backup/
-	scp -P $(port) $(user)@$(server):~/train-asr/egs/speaker_embeddings/speaker.embeddings.zip ../../.backup/
-.PHONY: dwn/speaker.embeddings
-
-dwn/lang: | ../../.backup/
-	scp -P $(port) $(user)@$(server):~/train-asr/egs/id_lang/lang.zip ../../.backup/
-.PHONY: dwn/lang
+#########################################################################
+dwn/db: | ../../.backup/
+	scp -r -P $(port) $(user)@$(server):~/train-asr/egs/db/backups/* ../../.backup/
+.PHONY: dwn/db
 
 ../../.backup/:
 	mkdir -p $@	
+#########################################################################
