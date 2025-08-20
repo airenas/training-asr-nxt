@@ -11,19 +11,13 @@ use clap::Parser;
 use crossbeam_channel::{bounded, select, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use runner::{
-    files::make_audio_name,
-    utils::system::{join_threads, setup_signal_handlers},
-    APP_NAME,
+    db::get_pool, files::make_audio_name, utils::system::{join_threads, setup_signal_handlers}, APP_NAME
 };
 use symphonia::{
     core::{io::MediaSourceStream, probe::Hint},
     default::get_probe,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use postgres::NoTls;
-use r2d2::Pool;
-use r2d2_postgres::PostgresConnectionManager;
 
 #[derive(Parser, Debug, Clone)]
 #[command(version = env!("CARGO_APP_VERSION"), name = APP_NAME, about="Data zipper", 
@@ -77,12 +71,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
     let cancel_rx = setup_signal_handlers();
 
-    let manager = PostgresConnectionManager::new(args.db_url.as_str().parse()?, NoTls);
-    let pool = Arc::new(
-        Pool::builder()
-            .max_size(args.workers as u32)
-            .build(manager)?,
-    );
+     let pool = get_pool(&args.db_url, args.workers as u32)?;
 
     tracing::info!("collecting files");
     let files = runner::files::collect_files(&args.input, &args.extensions, &args.cache_file)?;
@@ -180,9 +169,6 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     }
 
     join_threads(handles)?;
-
-    tracing::info!("closing connections");
-    drop(pool);
 
     let failed = *failed_count.lock().unwrap();
     if failed > 0 {

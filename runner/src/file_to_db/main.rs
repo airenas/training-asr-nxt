@@ -10,15 +10,9 @@ use clap::Parser;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use runner::{
-    data::structs::{File, FileMeta},
-    utils::system::{join_threads, setup_send_files, setup_signal_handlers},
-    APP_NAME,
+    data::structs::{File, FileMeta}, db::get_pool, utils::system::{join_threads, setup_send_files, setup_signal_handlers}, APP_NAME
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-use postgres::NoTls;
-use r2d2::Pool;
-use r2d2_postgres::PostgresConnectionManager;
 
 #[derive(Parser, Debug, Clone)]
 #[command(version = env!("CARGO_APP_VERSION"), name = APP_NAME, about="Data zipper", 
@@ -65,13 +59,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
     let cancel_rx = setup_signal_handlers();
 
-    let manager: PostgresConnectionManager<NoTls> =
-        PostgresConnectionManager::new(args.db_url.as_str().parse()?, NoTls);
-    let pool: Arc<Pool<PostgresConnectionManager<NoTls>>> = Arc::new(
-        Pool::builder()
-            .max_size(args.workers as u32)
-            .build(manager)?,
-    );
+    let pool = get_pool(&args.db_url, args.workers as u32)?;
 
     tracing::info!("collecting files");
     let files = runner::db::collect_files(pool.clone())?;
@@ -148,9 +136,6 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     }
 
     join_threads(handles)?;
-
-    tracing::info!("closing connections");
-    drop(pool);
 
     let failed = *failed_count.lock().unwrap();
 

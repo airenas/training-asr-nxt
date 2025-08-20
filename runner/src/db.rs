@@ -64,15 +64,39 @@ pub fn load(
     id: &str,
     type_: &str,
 ) -> anyhow::Result<crate::data::structs::File> {
-    tracing::debug!(id, type=type_, "Loading file to database");
-    let row = conn.query_one(
+    tracing::trace!(id, type=type_, "Loading file to database");
+    let row_opt: Option<postgres::Row> = conn.query_opt(
         "SELECT content FROM kv WHERE id = $1 AND type = $2",
         &[&id, &type_],
     )?;
-    let content: Vec<u8> = row.get("content");
-    Ok(crate::data::structs::File {
-        id: id.to_string(),
-        type_: type_.to_string(),
-        data: content,
-    })
+    match row_opt {
+        Some(row) => {
+            let content: Vec<u8> = row.get("content");
+            Ok(crate::data::structs::File {
+                id: id.to_string(),
+                type_: type_.to_string(),
+                data: content,
+            })
+        }
+        None => Err(anyhow::anyhow!(
+            "File with id '{}' and type '{}' not found in database",
+            id,
+            type_
+        )),
+    }
+}
+
+pub fn get_pool(
+    url: &str,
+    workers: u32,
+) -> anyhow::Result<Arc<Pool<PostgresConnectionManager<NoTls>>>> {
+    let size = if workers > 10 { 10 } else { workers };
+
+    let manager: PostgresConnectionManager<NoTls> =
+        PostgresConnectionManager::new(url.parse()?, NoTls);
+    let pool = Pool::builder()
+        .max_size(size)
+        .connection_timeout(std::time::Duration::from_secs(5))
+        .build(manager)?;
+    Ok(Arc::new(pool))
 }

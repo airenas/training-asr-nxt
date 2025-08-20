@@ -14,14 +14,8 @@ use clap::Parser;
 use console::Term;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
-use postgres::NoTls;
-use r2d2::Pool;
-use r2d2_postgres::PostgresConnectionManager;
 use runner::{
-    data::structs::FileMeta,
-    files,
-    utils::system::{join_threads, setup_send_files, setup_signal_handlers},
-    APP_NAME,
+    data::structs::FileMeta, db::get_pool, files, utils::system::{join_threads, setup_send_files, setup_signal_handlers}, APP_NAME
 };
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -91,13 +85,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
     let cancel_rx = setup_signal_handlers();
 
-    let manager: PostgresConnectionManager<NoTls> =
-        PostgresConnectionManager::new(args.db_url.as_str().parse()?, NoTls);
-    let pool: Arc<Pool<PostgresConnectionManager<NoTls>>> = Arc::new(
-        Pool::builder()
-            .max_size(args.workers as u32)
-            .build(manager)?,
-    );
+    let pool = get_pool(&args.db_url, args.workers as u32)?;
 
     tracing::info!("collecting files");
     let files: Vec<runner::data::structs::FileMeta> = runner::db::collect_files(pool.clone())?;
@@ -229,7 +217,9 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                         ) + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
                     );
                 }
+                
                 let res = files::run(&params);
+                
                 active_workers.fetch_sub(1, Ordering::SeqCst);
 
                 match res {

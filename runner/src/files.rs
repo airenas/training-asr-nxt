@@ -297,36 +297,6 @@ fn run_cmd(
     Ok(output_file.to_string_lossy().to_string())
 }
 
-fn get_cache_file_name(
-    file_path: &str,
-    input_dir: &str,
-    output_dir: &str,
-    name: &str,
-    same_dir: bool,
-) -> anyhow::Result<PathBuf> {
-    let abs_input_dir = Path::new(input_dir)
-        .absolutize()
-        .map_err(|e| anyhow::anyhow!("Failed to canonicalize input_dir: {}", e))?;
-    let abs_file_path = Path::new(file_path)
-        .absolutize()
-        .map_err(|e| anyhow::anyhow!("Failed to canonicalize file_path: {}", e))?;
-    let abs_output_dir = Path::new(output_dir)
-        .absolutize()
-        .map_err(|e| anyhow::anyhow!("Failed to canonicalize output_dir: {}", e))?;
-
-    let relative_path = abs_file_path
-        .as_ref()
-        .strip_prefix(abs_input_dir.as_ref())
-        .map_err(|e| anyhow::anyhow!("Failed to calculate relative path: {}", e))?;
-
-    let mut output_file_dir = abs_output_dir.join(relative_path);
-    if same_dir {
-        output_file_dir = output_file_dir.parent().unwrap().to_path_buf();
-    }
-    let cache_file_path = output_file_dir.join(name);
-    Ok(cache_file_path)
-}
-
 pub fn save(data: Vec<u8>, file_name: String) -> anyhow::Result<()> {
     let path = Path::new(&file_name);
     if let Some(parent) = path.parent() {
@@ -343,53 +313,6 @@ pub fn make_audio_name(audio_base: &str, path: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_get_cache_file_name() {
-        tracing_subscriber::fmt().with_test_writer().init();
-        // Define test cases
-        let test_cases = vec![
-            // Test case: simple
-            (
-                "/input/file.m4a",
-                "/input",
-                "/output",
-                "result.txt",
-                false,
-                "/output/file.m4a/result.txt",
-            ),
-            (
-                "/input/file.m4a",
-                "/input",
-                "/output",
-                "result.txt",
-                true,
-                "/output/result.txt",
-            ),
-            (
-                "/input/olia/file.m4a",
-                "/input",
-                "/output",
-                "result.txt",
-                false,
-                "/output/olia/file.m4a/result.txt",
-            ),
-            (
-                "/input/olia/file.m4a",
-                "/input",
-                "/output",
-                "result.txt",
-                true,
-                "/output/olia/result.txt",
-            ),
-        ];
-
-        for (file_path, input_dir, output_dir, name, same_dir, expected) in test_cases {
-            let result =
-                get_cache_file_name(file_path, input_dir, output_dir, name, same_dir).unwrap();
-            assert_eq!(result.to_str().unwrap(), expected);
-        }
-    }
 
     #[test]
     fn test_check_suffix() {
