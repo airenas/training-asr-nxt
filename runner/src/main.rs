@@ -15,7 +15,11 @@ use console::Term;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use runner::{
-    data::structs::FileMeta, db::get_pool, files, utils::system::{join_threads, setup_send_files, setup_signal_handlers}, APP_NAME
+    data::{errors::RunnerError, structs::FileMeta},
+    db::get_pool,
+    files,
+    utils::system::{join_threads, setup_send_files, setup_signal_handlers},
+    APP_NAME,
 };
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -217,9 +221,9 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                         ) + format!(", ({}), wrk: {}", eta_calculator.eta_str(), wrk_str).as_str(),
                     );
                 }
-                
+
                 let res = files::run(&params);
-                
+
                 active_workers.fetch_sub(1, Ordering::SeqCst);
 
                 match res {
@@ -238,11 +242,17 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                         *failed += 1;
                         let mut eta = eta_calculator.lock().unwrap();
                         eta.add_completed_with_duration();
-                        tracing::error!(
-                            file = file.path,
-                            err = %err,
-                            "Error processing file"
-                        );
+                        if let Some(RunnerError::RecordNotFound { id: _, type_: _ }) =
+                            err.downcast_ref::<RunnerError>()
+                        {
+                            tracing::warn!(file = file.path, "No initial file");
+                        } else {
+                            tracing::error!(
+                                file = file.path,
+                                err = %err,
+                                "Error processing file"
+                            );
+                        }
                     }
                 }
                 let pb = progress.lock().unwrap();

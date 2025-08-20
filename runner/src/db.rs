@@ -5,7 +5,7 @@ use postgres::NoTls;
 use r2d2::Pool;
 use r2d2_postgres::PostgresConnectionManager;
 
-use crate::data::structs::FileMeta;
+use crate::data::{errors::RunnerError, structs::FileMeta};
 
 pub fn collect_files(
     db: Arc<Pool<PostgresConnectionManager<NoTls>>>,
@@ -78,11 +78,11 @@ pub fn load(
                 data: content,
             })
         }
-        None => Err(anyhow::anyhow!(
-            "File with id '{}' and type '{}' not found in database",
-            id,
-            type_
-        )),
+        None => Err(RunnerError::RecordNotFound {
+            id: id.to_string(),
+            type_: type_.to_string(),
+        }
+        .into()),
     }
 }
 
