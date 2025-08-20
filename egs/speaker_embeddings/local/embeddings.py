@@ -99,17 +99,17 @@ def calc_embedding(params: Params, segments):
 def main(argv):
     logger.info("Starting")
     parser = argparse.ArgumentParser(description="Extracts speaker embeddings from a file")
-    parser.add_argument("--input", nargs='?', required=True, help="File")
+    parser.add_argument("--input_wav", nargs='?', required=True, help="Audio wav file")
+    parser.add_argument("--input_rttm", nargs='?', required=True, help="Audio rttm")
     parser.add_argument("--output", nargs='?', required=True, help="File")
     args = parser.parse_args(args=argv)
 
-    logger.info(f"Input file   : {args.input}")
+    logger.info(f"Input wav file   : {args.input_wav}")
+    logger.info(f"Input rttm file   : {args.input_rttm}")
     logger.info(f"Output file  : {args.output}")
 
-    dir_name = os.path.dirname(args.input)
-
-    params = Params(os.path.join(dir_name, "audio.16.wav"))
-    annotations = load_rttm(args.input)
+    params = Params(args.input_wav)
+    annotations = load_rttm(args.input_rttm)
     annotations = remove_overlaps(annotations)
     res = {}
     if len(annotations) > 0:

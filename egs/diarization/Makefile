@@ -36,7 +36,7 @@ run: | $(output_dir)
 
 run/runner: | $(output_dir) $(cache_dir)
 	$(runner) --input-base $(output_dir) --workers $(workers) \
-		--cmd "python local/pyannote.py --input {input_wav} --input_segments {input} --output {output}" \
+		--cmd "python local/pyannote.py --input_wav {input_wav} --input_segments {input} --output {output}" \
 		--output-files=audio.rttm,speech.rttm --input-files=audio.ina_segments --minimum-memory $(minimum_memory)
 .PHONY: run/runner	
 

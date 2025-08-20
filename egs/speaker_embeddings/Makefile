@@ -22,15 +22,10 @@ $(output_dir) $(cache_dir):
 	mkdir -p $@
 	
 run/runner: | $(output_dir)  $(cache_dir)
-	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
-		--cmd "python local/embeddings.py --input {input} --output {output}" \
-		--output-file speaker.embeddings.jsonl --extensions audio.rttm --minimum-memory $(minimum_memory) \
-		--same-dir --cache-file $(cache_dir)/.embeddings.cache
-.PHONY: run/runner	
-
-backup/res: 
-	$(zipper) --input $(output_dir) --output-file speaker.embeddings.zip --names="speaker.embeddings.jsonl"
-.PHONY: backup/res
+	$(runner) --input-base $(output_dir) --workers $(workers) \
+		--cmd "python local/embeddings.py --input_wav {input_wav} --input_rttm {input} --output {output}" \
+		--output-files=speaker.embeddings.jsonl --input-files=audio.rttm --minimum-memory $(minimum_memory)
+.PHONY: run/runner
 
 .data:
 	mkdir -p $@

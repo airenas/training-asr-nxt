@@ -29,16 +29,18 @@ def get_speaker_segments(annotation,
 def main(argv):
     logger.info("Starting")
     parser = argparse.ArgumentParser(description="Detect language for speakers")
-    parser.add_argument("--input", nargs='?', required=True, help="Audio file, must contains audio.rttm nearby")
+    parser.add_argument("--input_wav", nargs='?', required=True, help="Audio file")
+    parser.add_argument("--input_rttm", nargs='?', required=True, help="Audio.rttm")
     parser.add_argument("--output", nargs='?', required=True,
                         help="Output file in jsonl; each line is a json object with segment, lang and conf")
 
     args = parser.parse_args(args=argv)
 
-    logger.info(f"Input file   : {args.input}")
+    logger.info(f"Input audio file  : {args.input_wav}")
+    logger.info(f"Input RTTM file   : {args.input_rttm}")
     logger.info(f"Output file  : {args.output}")
 
-    annotations = load_rttm(args.input)
+    annotations = load_rttm(args.input_rttm)
     annotations = remove_overlaps(annotations)
     res = []
     if len(annotations) > 0:
@@ -53,7 +55,7 @@ def main(argv):
                     break
             if len(test_segments) > 0:
                 logger.info(f"Made test segments: {test_segments}")
-                speaker_lang = detect_language(args.input, test_segments)
+                speaker_lang = detect_language(args.input_wav, test_segments)
                 logger.info(f"Got results: {speaker_lang}")
                 res.append(SpeakerLangRes(speaker=sp, lang_res=speaker_lang))
 
