@@ -11,7 +11,8 @@ run:
 .PHONY: run
 ###############################################################################
 build/local: 
-	cargo build --release --bin runner --bin zipper --bin db-filler --bin file-to-db --bin db-to-file
+	cargo build --release --bin runner --bin zipper --bin db-filler --bin file-to-db --bin db-to-file \
+	--bin collect-jsonl
 .PHONY: build/local
 ###############################################################################
 run/zipper:

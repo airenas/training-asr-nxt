@@ -13,6 +13,7 @@ workers?=4
 memory_limit?=0
 limit_mb?=50
 runner?=../../runner/target/release/runner
+collector?=../../runner/target/release/colect-jsonl
 minimum_memory?=5GB
 PYTHONPATH=./../../
 LOG_LEVEL=$(log)
@@ -31,8 +32,8 @@ run/runner: | $(output_dir)  $(cache_dir)
 	mkdir -p $@
 
 .data/all.embeddings.jsonl:  | .data
-	$(python_cmd) local/collect_all.py  --input $(output_dir) --output $@
-
+	$(collector) --name speaker.embeddings.jsonl --output $@_
+	mv $@_ $@
 collect: .data/all.embeddings.jsonl
 .PHONY: collect
 

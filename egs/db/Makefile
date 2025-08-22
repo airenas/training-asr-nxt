@@ -37,10 +37,11 @@ psql/metadata:
 	docker compose exec -e PGPASSWORD=$(PSQL_PASS) metadata-db psql -U $(PSQL_USER) -h localhost -d $(DB_NAME)
 .PHONY: psql/metadata
 ########################################################################################################
-# Backup database
-backup/metadata:
+$(BACKUP_DIR):
 	mkdir -p $(BACKUP_DIR)
-	docker compose exec -e PGPASSWORD=$(PSQL_PASS) metadata-db pg_dump -U $(PSQL_USER) -d $(DB_NAME) -F c -f /tmp/backup.dump
+# Backup database
+backup/metadata: | $(BACKUP_DIR)
+	docker compose exec -it -e PGPASSWORD=$(PSQL_PASS) metadata-db pg_dump -v -U $(PSQL_USER) -d $(DB_NAME) -F c -f /tmp/backup.dump
 	docker compose cp metadata-db:/tmp/backup.dump $(BACKUP_FILE)
 	docker compose exec metadata-db rm /tmp/backup.dump
 	@echo "Backup saved to $(BACKUP_FILE)"
@@ -49,13 +50,14 @@ backup/metadata:
 ########################################################################################################
 # Restore database from a given file
 restore/metadata:
-ifndef FILE
-	$(error FILE variable is required, e.g., make restore/metadata FILE=./backups/metadata_20250818_123456.dump)
+ifndef restore_file
+	$(error restore_file variable is required, e.g., make restore/metadata restore_file=./backups/metadata_20250818_123456.dump)
 endif
-	docker compose cp $(FILE) metadata-db:/tmp/restore.dump
-	docker compose exec -e PGPASSWORD=$(PSQL_PASS) metadata-db pg_restore -U $(PSQL_USER) -d $(DB_NAME) -c /tmp/restore.dump
+	@echo -n "Restore from $(restore_file)? Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
+	docker compose cp $(restore_file) metadata-db:/tmp/restore.dump
+	docker compose exec -it -e PGPASSWORD=$(PSQL_PASS) metadata-db pg_restore -v -U $(PSQL_USER) -d $(DB_NAME) -c /tmp/restore.dump
 	docker compose exec metadata-db rm /tmp/restore.dump
-	@echo "Database restored from $(FILE)"
+	@echo "Database restored from $(restore_file)"
 .PHONY: restore/metadata
 ########################################################################################################
 .EXPORT_ALL_VARIABLES:

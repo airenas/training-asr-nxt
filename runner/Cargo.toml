@@ -66,3 +66,7 @@ path = "src/file_to_db/main.rs"
 [[bin]]
 name = "db-to-file"
 path = "src/db_to_file/main.rs"
+
+[[bin]]
+name = "collect-jsonl"
+path = "src/collect_jsonl/main.rs"

@@ -20,6 +20,7 @@ copy/scripts:
 	scp -P $(port) ../../runner/target/release/db-filler $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/file-to-db $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/db-to-file $(user)@$(server):~/train-asr/bin/
+	scp -P $(port) ../../runner/target/release/collect-jsonl $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
 
 #########################################################################
