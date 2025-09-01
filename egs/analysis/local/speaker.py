@@ -9,6 +9,20 @@ import psycopg2
 from preparation.logger import logger
 
 
+def load_rttm(conn, file_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT content FROM kv WHERE id = %s AND type = 'audio.rttm'",
+            (file_id,)
+        )
+        rttm_row = cur.fetchone()
+    if rttm_row:
+        rttm_bytes = rttm_row[0]
+        return parse_rttm_bytes(bytes(rttm_bytes))
+
+    raise ValueError(f"No RTTM found for file id {file_id}")
+
+
 def parse_rttm_bytes(rttm_bytes: bytes):
     speaker_segments: Dict[str, List[dict]] = {}
     text = bytes(rttm_bytes).decode("utf-8")
@@ -67,17 +81,7 @@ def main(argv):
             if not row:
                 raise ValueError(f"No file id {f}")
             path = row[1]
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT content FROM kv WHERE id = %s AND type = 'audio.rttm'",
-                    (f,)
-                )
-                rttm_row = cur.fetchone()
-            if rttm_row:
-                rttm_bytes = rttm_row[0]
-                rttm = parse_rttm_bytes(bytes(rttm_bytes))
-            else:
-                raise ValueError(f"No RTTM found for file id {f}")
+            rttm = load_rttm(conn, f)
             segments = rttm.get(speaker, [])
             if not segments:
                 raise ValueError(f"No segment for file id {f} speaker {speaker}")
@@ -92,7 +96,6 @@ def main(argv):
                 result.append(entry)
             logger.info(f"{path} -> {len(segments)} segments, {duration_f:.2f}s")
             duration_sum += duration_f
-
 
     with open(args.output, "w") as f:
         f.write(json.dumps(result, ensure_ascii=False))

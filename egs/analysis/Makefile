@@ -30,6 +30,14 @@ $(l_output_dir)/speaker.wav : $(l_output_dir)/speaker_out.json
 prepare/speaker-wav: $(l_output_dir)/speaker.wav
 .PHONY: prepare/speaker-wav
 ############################################################
+calc/speaker-times: 
+	$(python_cmd) local/speaker_in_file.py
+.PHONY: calc/speaker-times
+############################################################
+calc/speaker-lang:
+	$(python_cmd) local/speaker_lang_in_file.py
+.PHONY: calc/speaker-lang
+############################################################
 clean: 
 	rm -f $(l_output_dir)/speaker_out.json
 .EXPORT_ALL_VARIABLES:

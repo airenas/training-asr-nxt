@@ -13,3 +13,10 @@ CREATE TABLE IF NOT EXISTS kv (
     PRIMARY KEY (id, type)
 );
 
+CREATE TABLE IF NOT EXISTS file_speakers (
+    file_id VARCHAR(64) NOT NULL,     
+    speaker_id VARCHAR(64) NOT NULL,   -- ID of the speaker
+    duration_in_sec DOUBLE PRECISION, 
+    language TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (file_id, speaker_id)
+);
