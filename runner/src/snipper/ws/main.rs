@@ -97,6 +97,9 @@ async fn concat_handler(
             bytes,
         )
             .into_response(),
-        Err(e) => (axum::http::StatusCode::BAD_REQUEST, format!("error: {e}")).into_response(),
+        Err(e) => {
+            tracing::error!("Error in concat_segments: {}", e);
+            (axum::http::StatusCode::BAD_REQUEST, format!("error: {e}")).into_response()
+        },
     }
 }
