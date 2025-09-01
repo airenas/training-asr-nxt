@@ -39,6 +39,8 @@ r2d2_postgres = "0.18"
 md5 = "0.8.0"
 symphonia = "0.5.4"
 signal-hook = "0.3.18"
+hound = "3.5"
+axum = "0.8"
 
 [dev-dependencies]
 tracing-test = "0.2"
@@ -70,3 +72,11 @@ path = "src/db_to_file/main.rs"
 [[bin]]
 name = "collect-jsonl"
 path = "src/collect_jsonl/main.rs"
+
+[[bin]]
+name = "snipper"
+path = "src/snipper/main.rs"
+
+[[bin]]
+name = "snipper-ws"
+path = "src/snipper/ws/main.rs"
