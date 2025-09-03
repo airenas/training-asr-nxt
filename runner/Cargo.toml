@@ -53,6 +53,11 @@ tonic-build = "0.12"
 name = "runner"
 path = "src/main.rs"
 
+
+[[bin]]
+name = "fs-runner"
+path = "src/fs_runner/main.rs"
+
 [[bin]]
 name = "zipper"
 path = "src/zipper/main.rs"

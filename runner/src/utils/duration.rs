@@ -123,7 +123,7 @@ impl ETACalculator {
     }
 }
 
-fn format_duration_most_significant(dur: Duration) -> String {
+pub fn format_duration_most_significant(dur: Duration) -> String {
     let secs = dur.as_secs();
     let trimmed = if secs / 86_400 > 1 {
         Duration::from_secs((secs / 3_600) * 3_600)

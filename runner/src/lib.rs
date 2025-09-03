@@ -24,6 +24,16 @@ pub struct Params<'a> {
     pub pool: Arc<Pool<PostgresConnectionManager<NoTls>>>,
 }
 
+#[derive(Clone)]
+pub struct FileParams<'a> {
+    pub input_dir: &'a str,
+    pub output_dir: &'a str,
+    pub file_name: &'a str,
+    pub result_file_name: &'a str,
+    pub cmd: &'a str,
+    pub same_dir: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProcessStatus {
     Success,
