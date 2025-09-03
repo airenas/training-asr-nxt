@@ -35,6 +35,11 @@ dwn/db: | ../../.backup/
 	scp -r -P $(port) $(user)@$(server):~/train-asr/egs/db/backups/* ../../.backup/
 .PHONY: dwn/db
 
+#########################################################################
+dwn/cluster: | ../../.backup/
+	scp -r -P $(port) $(user)@$(server):~/train-asr/egs/speaker_embeddings/.data/clustered.jsonl ../../.backup/
+.PHONY: dwn/cluster
+
 ../../.backup/:
 	mkdir -p $@	
 #########################################################################
