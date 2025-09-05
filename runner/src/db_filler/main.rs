@@ -11,7 +11,10 @@ use clap::Parser;
 use crossbeam_channel::{bounded, select, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
 use runner::{
-    db::get_pool, files::make_audio_name, utils::system::{join_threads, setup_signal_handlers}, APP_NAME
+    db::get_pool,
+    files::make_audio_name,
+    utils::{files, system::{join_threads, setup_signal_handlers}},
+    APP_NAME,
 };
 use symphonia::{
     core::{io::MediaSourceStream, probe::Hint},
@@ -32,15 +35,15 @@ struct Args {
     /// Audio base dir
     #[arg(long, env, default_value = "")]
     audio_base: String,
+    /// Prefix to add
+    #[arg(long, env, default_value = "")]
+    prefix: String,
     /// Extensions
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     extensions: Vec<String>,
     /// Database URL
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     db_url: String,
-    /// Cache file
-    #[arg(long, env, default_value = ".runner.file.cache")]
-    cache_file: String,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -66,15 +69,16 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(input = args.input);
     tracing::info!(extensions = args.extensions.join(","));
     tracing::info!(audio_base = args.audio_base);
+    tracing::info!(prefix = args.prefix);
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
 
     let cancel_rx = setup_signal_handlers();
 
-     let pool = get_pool(&args.db_url, args.workers as u32)?;
+    let pool = get_pool(&args.db_url, args.workers as u32)?;
 
     tracing::info!("collecting files");
-    let files = runner::files::collect_files(&args.input, &args.extensions, &args.cache_file)?;
+    let files = files::collect_files(&args.input, &args.extensions)?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = Arc::new(Mutex::new(ProgressBar::new(files.len() as u64)));
@@ -100,6 +104,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         let cancel_rx = cancel_rx.clone();
         move || {
             for f in files {
+                tracing::debug!(file = ?f, "Queueing file");
                 select! {
                         send(tx, f) -> res => {
                     if res.is_err() {
@@ -128,6 +133,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         let input_path = input_path.clone();
         let audio_base = args.audio_base.clone();
         let failed_count = failed_count.clone();
+        let prefix = args.prefix.clone();
 
         handles.push(thread::spawn(move || {
             for file in rx.iter() {
@@ -136,7 +142,10 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                 }
 
                 let res: Result<(), anyhow::Error> = (|| {
-                    let file_name = get_name(&file, &input_path);
+                    let mut file_name = get_name(&file, &input_path);
+                    if !prefix.is_empty() {
+                        file_name = format!("{}/{}", prefix, file_name);
+                    }
                     tracing::debug!(worker_index, file_name, "Processing file");
                     let audio_file_name = make_audio_name(&audio_base, &file_name);
 

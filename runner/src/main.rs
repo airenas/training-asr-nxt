@@ -41,7 +41,7 @@ struct Args {
     #[arg(long, env, default_value = "")]
     cmd: String,
     //Input files
-    #[arg(long, env, value_delimiter = ',', default_value = "")]
+    #[arg(long, env, value_delimiter = ',', default_values_t = Vec::<String>::new())]
     input_files: Vec<String>,
     /// Minimum Memory on the system to be available start new worker
     #[arg(long, env, default_value = "10G",value_parser = parse_bytesize)]

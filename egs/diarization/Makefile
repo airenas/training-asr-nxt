@@ -40,6 +40,12 @@ run/runner: | $(output_dir) $(cache_dir)
 		--output-files=audio.rttm,speech.rttm --input-files=audio.ina_segments --minimum-memory $(minimum_memory)
 .PHONY: run/runner	
 
+run/runner/full: | $(output_dir) $(cache_dir)
+	$(runner) --input-base $(output_dir) --workers $(workers) \
+		--cmd "python local/pyannote_full.py --input_wav {input_wav} --output {output}" \
+		--output-files=audio.rttm --minimum-memory $(minimum_memory)
+.PHONY: run/runner/full
+
 run/runner/grid: | $(output_dir) $(cache_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
 		--cmd "python local/to_textgrid.py --input {input} --output {output}" \

@@ -17,56 +17,8 @@ use tempfile::TempDir;
 use crate::{
     data::structs::File,
     db::{self, exists, load},
-    utils::cache::{load_cache, save_cache},
     Params, ProcessStatus,
 };
-
-pub fn collect_files(
-    in_dir: &str,
-    extensions: &[String],
-    cache_file: &str,
-) -> anyhow::Result<Vec<PathBuf>> {
-    tracing::trace!(in_dir = in_dir, extensions = ?extensions, cache_file = cache_file);
-    let res = load_cache(cache_file)?;
-    if !res.is_empty() {
-        tracing::trace!("Loaded file list from cache");
-        return Ok(res);
-    }
-
-    let l_ext = extensions
-        .iter()
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_lowercase())
-        .collect::<Vec<String>>();
-    let (suffix, extensions) = if !l_ext.is_empty() {
-        (l_ext[0].clone(), l_ext[1..].to_vec())
-    } else {
-        (String::new(), Vec::new())
-    };
-
-    let mut files: Vec<PathBuf> = WalkDir::new(in_dir)
-        .parallelism(jwalk::Parallelism::Serial)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| check_suffix(&e.path(), &suffix))
-        .filter(|e| check_extensions(&e.path(), &extensions))
-        .filter_map(|e| {
-            e.path()
-                .canonicalize()
-                .map_err(|err| {
-                    tracing::error!("skip {}: {}", e.path().display(), err);
-                })
-                .ok()
-        })
-        .collect();
-    tracing::debug!(len = files.len(), "Found files in directory");
-    files.sort();
-    tracing::debug!("Sorted");
-
-    save_cache(cache_file, &files)?;
-    Ok(files)
-}
 
 pub fn collect_all_files(
     in_dir: &str,
@@ -143,43 +95,8 @@ fn has_name(e: &Path, suffix: &[String]) -> bool {
     suffix.iter().any(|s| s == file)
 }
 
-fn check_extensions(e: &Path, extensions: &[String]) -> bool {
-    if extensions.is_empty() {
-        return true;
-    }
-    let dir = match e.parent() {
-        Some(d) => d,
-        None => return false,
-    };
-    let entries = std::fs::read_dir(dir);
-    let files = match entries {
-        Ok(entries) => entries,
-        Err(e) => {
-            tracing::error!("Failed to read directory: {}: {}", dir.to_str().unwrap(), e);
-            return false;
-        }
-    };
-
-    for f in files.flatten() {
-        if let Some(name) = f.file_name().to_str().map(|s| s.to_lowercase()) {
-            if f.file_type().map(|ft| ft.is_file()).unwrap_or(false)
-                && extensions.iter().any(|ext| name.ends_with(ext))
-            {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
     tracing::trace!(file = params.file_meta.path);
-
-    if params.input_files.is_empty() {
-        return Err(anyhow::anyhow!(
-            "No input files found, skipping command execution"
-        ));
-    }
 
     if params.output_files.is_empty() {
         return Err(anyhow::anyhow!(
@@ -205,7 +122,10 @@ pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
 
     drop(conn);
 
-    let input_file = dir.path().join(params.output_files[0].as_str());
+    let mut input_file = PathBuf::new();
+    if !params.input_files.is_empty() {
+        input_file = dir.path().join(params.input_files[0].as_str());
+    }
     let output_file = dir.path().join(params.output_files[0].as_str());
 
     let res = run_cmd(
@@ -251,7 +171,7 @@ fn run_cmd(
     output_file: &Path,
     file_name: &str,
 ) -> anyhow::Result<String> {
-    if !cmd.contains("{input}") && !cmd.contains("{output}") {
+    if !(cmd.contains("{input}") || cmd.contains("{input_wav}")) || !cmd.contains("{output}") {
         return Err(anyhow::anyhow!("Command does not contain placeholders"));
     }
 

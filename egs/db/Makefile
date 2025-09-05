@@ -24,6 +24,9 @@ run:
 run/filler: 
 	$(filler) --input=$(corpus_dir) --workers=$(workers) --audio-base=$(output_dir) --extensions=m4a
 .PHONY: run/runner
+run/filler/08khz: 
+	$(filler) --input=$(corpus_dir)/08khz --workers=$(workers) --prefix 08khz --audio-base=$(output_dir) --extensions=m4a,wav,mp3
+.PHONY: run/runner
 ########################################################################################################
 run/to-db: 
 	$(file-to-db) --workers=$(workers) --input-base=$(output_dir) --names=$(file)
