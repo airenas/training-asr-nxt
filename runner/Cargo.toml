@@ -41,6 +41,7 @@ symphonia = "0.5.4"
 signal-hook = "0.3.18"
 hound = "3.5"
 axum = "0.8"
+nix = { version = "0.30", features = ["signal", "process"] }
 
 [dev-dependencies]
 tracing-test = "0.2"
@@ -53,6 +54,9 @@ tonic-build = "0.12"
 name = "runner"
 path = "src/main.rs"
 
+[[bin]]
+name = "runner-wrk"
+path = "src/runner_wrk/main.rs"
 
 [[bin]]
 name = "fs-runner"

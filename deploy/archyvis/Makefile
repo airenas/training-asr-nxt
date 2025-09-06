@@ -28,6 +28,7 @@ copy/scripts:
 	scp -P $(port) ../../runner/target/release/db-to-file $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/collect-jsonl $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/snipper-ws $(user)@$(server):~/train-asr/bin/
+	scp -P $(port) ../../runner/target/release/runner-wrk $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/fs-runner $(user)@$(server):~/train-asr/bin/
 

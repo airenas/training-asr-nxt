@@ -95,7 +95,7 @@ fn has_name(e: &Path, suffix: &[String]) -> bool {
     suffix.iter().any(|s| s == file)
 }
 
-pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
+pub fn run(params: &mut Params) -> anyhow::Result<ProcessStatus> {
     tracing::trace!(file = params.file_meta.path);
 
     if params.output_files.is_empty() {
@@ -128,7 +128,7 @@ pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
     }
     let output_file = dir.path().join(params.output_files[0].as_str());
 
-    let res = run_cmd(
+    let res = (params.run_f)(
         params.cmd,
         params.input_base_dir,
         &input_file,
@@ -164,7 +164,7 @@ pub fn run(params: &Params) -> anyhow::Result<ProcessStatus> {
     Ok(ProcessStatus::Success)
 }
 
-fn run_cmd(
+pub fn run_cmd(
     cmd: &str,
     input_base_dir: &str,
     input_file: &Path,

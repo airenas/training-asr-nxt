@@ -12,6 +12,7 @@ workers?=4
 memory_limit?=0
 limit_mb?=50
 runner?=../../runner/target/release/runner
+runner-wrk?=../../runner/target/release/runner-wrk
 minimum_memory?=5GB
 PYTHONPATH=./../../
 LOG_LEVEL=$(log)
@@ -45,6 +46,12 @@ run/runner/full: | $(output_dir) $(cache_dir)
 		--cmd "python local/pyannote_full.py --input_wav {input_wav} --output {output}" \
 		--output-files=audio.rttm --minimum-memory $(minimum_memory)
 .PHONY: run/runner/full
+
+run/runner-wrk/full: | $(output_dir) $(cache_dir)
+	$(runner-wrk) --input-base $(output_dir) --workers $(workers) \
+		--cmd "python local/wrk_pyannote_full.py" \
+		--output-files=audio.rttm --minimum-memory $(minimum_memory)
+.PHONY: run/runner-wrk/full
 
 run/runner/grid: | $(output_dir) $(cache_dir)
 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \

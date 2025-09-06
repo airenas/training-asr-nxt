@@ -19,6 +19,7 @@ use runner::{
     db::get_pool,
     files,
     utils::system::{join_threads, setup_send_files, setup_signal_handlers},
+    worker::pipe::Worker,
     APP_NAME,
 };
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
@@ -138,6 +139,8 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         let pool = pool.clone();
 
         handles.push(thread::spawn(move || {
+            let mut wrk = Worker::new(&args.cmd)?;
+
             for file in rx.iter() {
                 let active_workers = active_workers.clone();
 
@@ -199,7 +202,12 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                     output_files: &output_files,
                     file_meta: &file,
                     pool: pool.clone(),
-                    run_f: Box::new(files::run_cmd),
+                    run_f: Box::new({
+                        let w = &mut wrk;
+                        move |cmd, base, input_file, output_file, file_name| {
+                            w.run_task(cmd, base, input_file, output_file, file_name)
+                        }
+                    }),
                 };
 
                 tracing::debug!(file = file.path);

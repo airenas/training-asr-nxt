@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use postgres::NoTls;
 use r2d2::Pool;
@@ -10,10 +10,11 @@ pub mod data;
 pub mod files;
 pub mod utils;
 pub mod db;
+pub mod worker;
 
 pub const APP_NAME: &str = "runner";
 
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct Params<'a> {
     pub worker_index: u16,
     pub input_base_dir: &'a str,
@@ -22,6 +23,7 @@ pub struct Params<'a> {
     pub output_files: &'a Vec<String>,
     pub file_meta: &'a  FileMeta,
     pub pool: Arc<Pool<PostgresConnectionManager<NoTls>>>,
+    pub run_f: Box<dyn FnMut(&str, &str, &Path, &Path, &str) -> anyhow::Result<String>+ 'a>,
 }
 
 #[derive(Clone)]

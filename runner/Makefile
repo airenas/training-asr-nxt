@@ -12,7 +12,7 @@ run:
 ###############################################################################
 build/local: 
 	cargo build --release --bin runner --bin zipper --bin db-filler --bin file-to-db --bin db-to-file \
-	--bin collect-jsonl --bin snipper-ws --bin fs-runner
+	--bin collect-jsonl --bin snipper-ws --bin fs-runner --bin runner-wrk
 .PHONY: build/local
 ###############################################################################
 run/zipper:
