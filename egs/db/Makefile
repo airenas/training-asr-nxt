@@ -27,6 +27,13 @@ run/filler:
 run/filler/08khz: 
 	$(filler) --input=$(corpus_dir)/08khz --workers=$(workers) --prefix 08khz --audio-base=$(output_dir) --extensions=m4a,wav,mp3
 .PHONY: run/runner
+
+run/filler/voxlingua: 
+	$(filler) --input=$(voxlingua_dir) --workers=$(workers) --prefix voxlingua --audio-base=$(output_dir) --extensions=m4a,wav,mp3,ogg --source voxlingua
+.PHONY: run/runner/voxlingua
+run/filler/voxpopuli: 
+	$(filler) --input=$(voxpopuli_dir) --workers=$(workers) --prefix voxpopuli --audio-base=$(output_dir) --extensions=m4a,wav,mp3,ogg --source voxpopuli
+.PHONY: run/runner/voxpopuli
 ########################################################################################################
 run/to-db: 
 	$(file-to-db) --workers=$(workers) --input-base=$(output_dir) --names=$(file)

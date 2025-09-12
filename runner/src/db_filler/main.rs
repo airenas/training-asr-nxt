@@ -38,6 +38,9 @@ struct Args {
     /// Prefix to add
     #[arg(long, env, default_value = "")]
     prefix: String,
+    /// Source to insert into db
+    #[arg(long, env, default_value = "")]
+    source: String,
     /// Extensions
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     extensions: Vec<String>,
@@ -70,6 +73,8 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(extensions = args.extensions.join(","));
     tracing::info!(audio_base = args.audio_base);
     tracing::info!(prefix = args.prefix);
+    tracing::info!(source = args.source);
+    tracing::info!(workers = args.workers);
     let cwd = env::current_dir()?;
     tracing::info!(cwd = cwd.display().to_string());
 
@@ -134,6 +139,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         let audio_base = args.audio_base.clone();
         let failed_count = failed_count.clone();
         let prefix = args.prefix.clone();
+        let source = args.source.clone();
 
         handles.push(thread::spawn(move || {
             for file in rx.iter() {
@@ -158,9 +164,9 @@ fn main_int(args: Args) -> anyhow::Result<()> {
 
                     let mut conn = pool.get_timeout(Duration::from_secs(10))?;
                     conn.execute(
-                        "INSERT INTO files (id, path, duration_in_sec) VALUES ($1, $2, $3)
+                        "INSERT INTO files (id, path, duration_in_sec, source) VALUES ($1, $2, $3, $4)
                      ON CONFLICT (id) DO NOTHING",
-                        &[&id, &file_name.to_string(), &duration_in_sec],
+                        &[&id, &file_name.as_str(), &duration_in_sec, &source.as_str()],
                     )?;
                     Ok(())
                 })();

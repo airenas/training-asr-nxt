@@ -2,8 +2,11 @@ CREATE TABLE IF NOT EXISTS files (
     id VARCHAR(64) NOT NULL,  -- SHA1/MD5 hash of original filename
     path TEXT NOT NULL,       -- Keep the real filename
     duration_in_sec DOUBLE PRECISION, 
+    source VARCHAR(20) NOT NULL DEFAULT '', -- e.g., "librispeech", "voxpopuli", etc.
     PRIMARY KEY (id)
 );
+
+CREATE INDEX idx_files_source ON files(source);
 
 CREATE TABLE IF NOT EXISTS kv (
     id VARCHAR(64) NOT NULL,      -- SHA1/MD5 hash of original filename
