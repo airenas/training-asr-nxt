@@ -42,6 +42,10 @@ dwn/cluster: | ../../.backup/
 	scp -r -P $(port) $(user)@$(server):~/train-asr/egs/speaker_embeddings/.data/clustered.jsonl ../../.backup/
 .PHONY: dwn/cluster
 
-../../.backup/:
+../../.backup/ .data:
 	mkdir -p $@	
 #########################################################################
+dwn/sample: | .data
+# 	scp -r -P $(port) $(user)@$(server):/mnt/md1/audio-corpus/16khz/vu-liepa1/WAV/D118/Z022/Z118Mi_022_104_02.wav/audio.16.wav .data/
+	scp -r -P $(port) $(user)@$(server):/mnt/md1/aireno/voxpopuli/v1/raw_audios/lt/2017/20171212-0900-PLENARY-23_lt.ogg .data/
+.PHONY: dwn/sample
