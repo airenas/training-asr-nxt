@@ -18,7 +18,7 @@ use runner::{
     data::{errors::RunnerError, structs::FileMeta},
     db::get_pool,
     files,
-    utils::system::{join_threads, setup_send_files, setup_signal_handlers},
+    utils::{duration::get_info_str, system::{join_threads, setup_send_files, setup_signal_handlers}},
     worker::pipe::Worker,
     APP_NAME,
 };
@@ -352,27 +352,3 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_info_str(
-    use_color: bool,
-    ok: i32,
-    skipped: i32,
-    failed: i32,
-    rem: i32,
-    speed: f32,
-) -> String {
-    format!(
-        "done: {}, skipped: {}, failed: {}, rem: {}, speed/d: {:.1}",
-        paint(use_color, Color::Green, ok),
-        paint(use_color, Color::Yellow, skipped),
-        paint(use_color, Color::Red, failed),
-        paint(use_color, Color::Green, rem),
-        speed,
-    )
-}
-
-fn paint(use_color: bool, colour: Color, v: i32) -> String {
-    if use_color && v > 0 {
-        return colour.bold().paint(format!("{v}")).to_string();
-    }
-    format!("{v}")
-}
