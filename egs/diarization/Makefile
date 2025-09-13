@@ -18,6 +18,7 @@ PYTHONPATH=./../../
 LOG_LEVEL=$(log)
 RUST_LOG?=trace
 cache_dir=./../../.cache
+source=
 
 
 cpu?=60
@@ -44,13 +45,13 @@ run/runner: | $(output_dir) $(cache_dir)
 run/runner/full: | $(output_dir) $(cache_dir)
 	$(runner) --input-base $(output_dir) --workers $(workers) \
 		--cmd "python local/pyannote_full.py --input_wav {input_wav} --output {output}" \
-		--output-files=audio.rttm --minimum-memory $(minimum_memory)
+		--output-files=audio.rttm --minimum-memory $(minimum_memory)  --source $(source) 
 .PHONY: run/runner/full
 
 run/runner-wrk/full: | $(output_dir) $(cache_dir)
 	$(runner-wrk) --input-base $(output_dir) --workers $(workers) \
 		--cmd "python local/wrk_pyannote_full.py" \
-		--output-files=audio.rttm --minimum-memory $(minimum_memory)
+		--output-files=audio.rttm --minimum-memory $(minimum_memory) --source $(source) 
 .PHONY: run/runner-wrk/full
 
 run/runner/grid: | $(output_dir) $(cache_dir)

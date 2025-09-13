@@ -2,7 +2,7 @@
 -include ../../Makefile.options
 ############################################################
 include .env
-BACKUP_DIR=./backups
+BACKUP_DIR?=./backups
 BACKUP_FILE=$(BACKUP_DIR)/metadata_$(shell date +%Y%m%d_%H%M%S).dump
 DB_NAME=metadata
 PSQL_USER=user

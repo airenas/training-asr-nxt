@@ -27,6 +27,10 @@ struct Args {
     /// Database URL
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     db_url: String,
+    /// Source to filter the db
+    #[arg(long, env, default_value = "")]
+    source: String,
+
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -59,7 +63,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     let pool = get_pool(&args.db_url, 1)?;
 
     tracing::info!("collecting files");
-    let files = runner::db::collect_files(pool.clone())?;
+    let files = runner::db::collect_files(pool.clone(), &args.source)?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = ProgressBar::new(files.len() as u64);

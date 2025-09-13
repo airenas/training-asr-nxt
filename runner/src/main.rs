@@ -52,6 +52,9 @@ struct Args {
     /// Database URL
     #[arg(long, env, value_delimiter = ',', default_value = "")]
     db_url: String,
+    /// Source to filter the db
+    #[arg(long, env, default_value = "")]
+    source: String,
 }
 
 fn parse_bytesize(s: &str) -> Result<ByteSize, String> {
@@ -82,6 +85,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     tracing::info!(input_base = args.input_base);
     tracing::info!(input_files = args.input_files.join(","));
     tracing::info!(output_files = args.output_files.join(","));
+    tracing::info!(source = args.source);
     tracing::info!(minimum_memory = args.minimum_memory.to_string());
     tracing::info!(cmd = args.cmd);
     let cwd = env::current_dir()?;
@@ -92,7 +96,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     let pool = get_pool(&args.db_url, args.workers as u32)?;
 
     tracing::info!("collecting files");
-    let files: Vec<runner::data::structs::FileMeta> = runner::db::collect_files(pool.clone())?;
+    let files: Vec<runner::data::structs::FileMeta> = runner::db::collect_files(pool.clone(), &args.source)?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = Arc::new(Mutex::new(ProgressBar::new(files.len() as u64)));

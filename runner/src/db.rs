@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{self};
-use postgres::NoTls;
+use postgres::{types::ToSql, NoTls};
 use r2d2::Pool;
 use r2d2_postgres::PostgresConnectionManager;
 
@@ -9,15 +9,29 @@ use crate::data::{errors::RunnerError, structs::FileMeta};
 
 pub fn collect_files(
     db: Arc<Pool<PostgresConnectionManager<NoTls>>>,
+    source: &str,
 ) -> anyhow::Result<Vec<FileMeta>> {
     tracing::trace!("loading");
 
     let mut conn = db.get()?;
 
-    let rows = conn.query(
-        "SELECT id, path, duration_in_sec FROM files ORDER BY path",
-        &[],
-    )?;
+    if source != "" {
+        tracing::info!(source, "Filtering by source");
+    }
+
+    let (query, params): (&str, &[&(dyn ToSql + Sync)]) = if source != "" {
+        (
+            "SELECT id, path, duration_in_sec FROM files WHERE source = $1 ORDER BY path",
+            &[&source],
+        )
+    } else {
+        (
+            "SELECT id, path, duration_in_sec FROM files ORDER BY path",
+            &[],
+        )
+    };
+
+    let rows = conn.query(query, params)?;
 
     let mut result = Vec::new();
     for row in rows {

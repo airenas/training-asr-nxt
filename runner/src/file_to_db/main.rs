@@ -62,7 +62,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
     let pool = get_pool(&args.db_url, args.workers as u32)?;
 
     tracing::info!("collecting files");
-    let files = runner::db::collect_files(pool.clone())?;
+    let files = runner::db::collect_files(pool.clone(), "")?;
     tracing::info!(len = files.len(), "files collected");
 
     let progress = Arc::new(Mutex::new(ProgressBar::new(files.len() as u64)));
