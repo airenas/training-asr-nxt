@@ -114,6 +114,8 @@ pub fn run(params: &mut Params) -> anyhow::Result<ProcessStatus> {
 
     let dir = TempDir::new()?;
 
+    tracing::trace!(tmp = dir.path().display().to_string(), "Using temp dir");
+
     for file in params.input_files.iter() {
         let file_name = dir.path().join(file);
         let data = load(&mut conn, &params.file_meta.id, file)?;

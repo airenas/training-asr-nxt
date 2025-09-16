@@ -44,10 +44,10 @@ def main(argv):
 
                 else:
                     logger.warn("Got empty result")
-            print("ok", flush=True)
+            print("\nwrk-res: ok", flush=True)
         except Exception as e:
             logger.error(f"Failed to process line {line}: {e}")
-            print(f"error: {str(e)}", flush=True)
+            print(f"\nwrk-res: error: {str(e)}", flush=True)
 
     logger.info(f"Done")
 

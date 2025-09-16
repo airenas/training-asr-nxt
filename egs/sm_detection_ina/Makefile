@@ -16,6 +16,7 @@ zipper?=../../runner/target/release/zipper
 workers?=4
 minimum_memory?=10GB
 RUST_LOG?=trace
+source=
 ############################################################
 $(output_dir) $(cache_dir):
 	mkdir -p $@
@@ -25,15 +26,17 @@ run: | $(output_dir)
 	    --limit_mb $(limit_mb)
 .PHONY: run	
 
-run/runner: | $(output_dir)  $(cache_dir)
-	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
-		--cmd "python local/detect_smn.py --input {input} --output {output}" \
-		--output-file audio.ina_segments --extensions wav --minimum-memory $(minimum_memory) \
-		--same-dir --cache-file $(cache_dir)/.sm.cache
-.PHONY: run/runner	
+# run/runner: | $(output_dir)  $(cache_dir)
+# 	$(runner) --input $(output_dir) --output $(output_dir) --workers $(workers) \
+# 		--cmd "python local/detect_smn.py --input {input} --output {output}" \
+# 		--output-file audio.ina_segments --extensions wav --minimum-memory $(minimum_memory) \
+# 		--same-dir --cache-file $(cache_dir)/.sm.cache
+# .PHONY: run/runner	
 
-backup/res: 
-	$(zipper) --input $(output_dir) --output-file ina_segments.zip --names="audio.ina_segments"
-.PHONY: backup/res
+run/runner-wrk: | $(output_dir) 
+	$(runner-wrk) --input-base $(output_dir) --workers $(workers) \
+		--cmd "python local/wrk_detect_smn.py" \
+		--output-files=audio.ina_segments --minimum-memory $(minimum_memory) --source $(source) 
+.PHONY: run/runner-wrk
 
 .EXPORT_ALL_VARIABLES:

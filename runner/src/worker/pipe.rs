@@ -77,13 +77,33 @@ impl Worker {
         writeln!(self.stdin, "{}", json)?;
         self.stdin.flush()?;
 
-        let mut response = String::new();
-        self.stdout.read_line(&mut response)?;
-        let res = response.trim().to_string();
+        let res = read_result(&mut self.stdout)?;
         if res != "ok" {
             return Err(anyhow::anyhow!("Worker failed: {}", res));
         }
         Ok(output_file.to_string_lossy().to_string())
+    }
+}
+
+fn read_result(stdout: &mut BufReader<ChildStdout>) -> anyhow::Result<String> {
+    let mut buf = String::new();
+    loop {
+        let n = stdout.read_line(&mut buf)?;
+        if n == 0 {
+            return Err(anyhow::anyhow!("Worker process terminated unexpectedly"));
+        }
+        for raw in buf.split_terminator('\n') {
+            let line = raw.trim();
+            tracing::debug!(line, "output");
+
+            if line.starts_with("wrk-res:") {
+                let result = line[8..].trim().to_string();
+                tracing::debug!(result, "Worker response");
+                return Ok(result);
+            }
+        }
+
+        buf.clear();
     }
 }
 
