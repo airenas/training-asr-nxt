@@ -14,6 +14,7 @@ memory_limit?=0
 limit_mb?=50
 runner?=../../runner/target/release/runner
 collector?=../../runner/target/release/colect-jsonl
+runner-wrk?=../../runner/target/release/runner-wrk
 minimum_memory?=5GB
 PYTHONPATH=./../../
 LOG_LEVEL=$(log)
@@ -27,6 +28,13 @@ run/runner: | $(output_dir)  $(cache_dir)
 		--cmd "python local/embeddings.py --input_wav {input_wav} --input_rttm {input} --output {output}" \
 		--output-files=speaker.embeddings.jsonl --input-files=audio.rttm --minimum-memory $(minimum_memory)
 .PHONY: run/runner
+
+run/runner-wrk: | $(output_dir) 
+	$(runner-wrk) --input-base $(output_dir) --workers $(workers) \
+		--cmd "python local/wrk_embeddings.py" \
+		--output-files=speaker.embeddings.jsonl --minimum-memory $(minimum_memory) --source $(source) \
+		--input-files=audio.rttm
+.PHONY: run/runner-wrk
 
 .data:
 	mkdir -p $@
