@@ -6,3 +6,4 @@ distributed==2025.4.1
 inaSpeechSegmenter==0.7.14
 tensorflow==2.19.0
 
+

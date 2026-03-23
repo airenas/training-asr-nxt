@@ -9,6 +9,7 @@ workers?=4
 RUST_LOG?=trace
 log?=INFO
 python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
+skip_input?=0
 ############################################################
 $(output_dir) $(l_output_dir):
 	mkdir -p $@
@@ -39,13 +40,18 @@ calc/speaker-lang:
 .PHONY: calc/speaker-lang
 ############################################################
 $(l_output_dir)/global_speaker.jsonl:
-	$(python_cmd) local/global_speaker_durations.py --input ../../.backup/clustered.jsonl --output $(l_output_dir)/global_speaker.jsonl
+	$(python_cmd) local/global_speaker_durations.py --input ../speaker_embeddings/.data/clustered.jsonl --output $(l_output_dir)/global_speaker.jsonl
 calc/global-speaker: $(l_output_dir)/global_speaker.jsonl	
 .PHONY: calc/global-speaker
 ############################################################
 query: $(l_output_dir)/global_speaker.jsonl
 	$(python_cmd) local/query_global.py --input $(l_output_dir)/global_speaker.jsonl
 .PHONY: query
+############################################################
+run/label/gender: | $(l_output_dir)
+	$(python_cmd) local/label_gender.py --input ../speaker_embeddings/.data/clustered.jsonl --output $(l_output_dir)/gender.jsonl \
+	--model ../gender/.data/model.json \
+	--audio-url http://localhost:8000/concat --skip-input $(skip_input)
 ############################################################
 clean: 
 	rm -f $(l_output_dir)/speaker_out.json
