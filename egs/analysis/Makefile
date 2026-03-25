@@ -53,6 +53,10 @@ run/label/gender: | $(l_output_dir)
 	--model ../gender/.data/model.json \
 	--audio-url http://localhost:8000/concat --skip-input $(skip_input)
 ############################################################
+run/cluster/analysis: 
+	$(python_cmd) local/cluster_analysis.py --input ../speaker_embeddings/.data/clustered.jsonl \
+	--audio-url http://localhost:8000/concat --skip-input $(skip_input)	
+############################################################
 clean: 
 	rm -f $(l_output_dir)/speaker_out.json
 .EXPORT_ALL_VARIABLES:

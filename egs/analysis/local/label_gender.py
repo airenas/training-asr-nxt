@@ -18,12 +18,15 @@ from preparation.metadata.embedding import get_speaker_embedding
 
 
 def get_audio_bytes(url, segments):
+    logger.info(f"start get audio bytes for segments")
     response = requests.post(
         url,
         json=segments,
+        timeout=10
     )
 
     response.raise_for_status()
+    logger.info(f"got audio bytes: {len(response.content)}")
     return response.content
 
 
@@ -45,7 +48,6 @@ class Speaker:
 @dataclass
 class ViewItem:
     index: int
-    title: str
     predicted: str
     real: str
     audio: bytes | None
@@ -160,7 +162,7 @@ class App:
 
 
 def make_description(sp: Speaker) -> str:
-    return f"{sp.index} | {json.dumps(sp.data[0], ensure_ascii=False)}({len(sp.data)})"
+    return f"{sp.index} | {json.dumps(sp.data[0:2], ensure_ascii=False)}({len(sp.data)})"
 
 
 def main(argv):
@@ -191,11 +193,10 @@ def main(argv):
             return empty_item()
         item = ViewItem(
             index=sp.index,
-            title=json.dumps(sp.data[0], ensure_ascii=False),
             predicted=gender_to_str(sp.predicted_label),
             real=gender_to_str(sp.real_label),
             audio=sp.audio,
-            data=sp.data[:10],
+            data=sp.data[:100],
         )
         pred_str = f"{sp.predicted_label.name}"
         if sp.real_label == sp.predicted_label:
@@ -264,6 +265,7 @@ def gender_to_str(gender: Gender | None):
 
 
 def make_segments(conn, data, min_segment_duration: float = 1.0, max_segments: int = 10):
+    logger.info(f"start make segments")
     res = []
     for item in data:
         f = item.get("f")
