@@ -14,3 +14,9 @@ class Gender(Enum):
             return cls.FEMALE
         return cls.UNK
 
+    def to_str(self) -> str:
+        if self == Gender.MALE:
+            return "m"
+        elif self == Gender.FEMALE:
+            return "f"
+        return '-'
