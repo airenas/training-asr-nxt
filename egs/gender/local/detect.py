@@ -55,12 +55,13 @@ def main(argv):
     with psycopg2.connect(dsn=db_url) as conn:
         with open(args.input_cluster, "r", encoding="utf-8") as f:
             with open(args.output, "w", encoding="utf-8") as output_f:
-                for i, line in enumerate(tqdm(f, desc=f"Processing", total=total)):
+                pbar = tqdm(f, desc="Processing", total=total)
+                for i, line in enumerate(pbar):
                     if not line.strip():
                         continue
                     data = json.loads(line)
                     test  = take_random(data, 10)
-
+                    pbar.set_postfix(cluster_size=len(data), test_size=len(test))
                     t_res = set()
                     for item in test:
                         emb = get_speaker_embedding(conn, item["f"], item["sp"])
