@@ -42,6 +42,7 @@ signal-hook = "0.3.18"
 hound = "3.5"
 axum = "0.8"
 nix = { version = "0.30", features = ["signal", "process"] }
+sherpa-onnx = "0.1"
 
 [dev-dependencies]
 tracing-test = "0.2"
@@ -89,3 +90,7 @@ path = "src/snipper/main.rs"
 [[bin]]
 name = "snipper-ws"
 path = "src/snipper/ws/main.rs"
+
+[[bin]]
+name = "vad"
+path = "src/vad/main.rs"

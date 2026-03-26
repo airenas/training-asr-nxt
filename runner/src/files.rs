@@ -229,6 +229,10 @@ pub fn save(data: Vec<u8>, file_name: String) -> anyhow::Result<()> {
 }
 
 pub fn make_audio_name(audio_base: &str, path: &str) -> PathBuf {
+    if audio_base.is_empty() {
+        // If the audio base is empty, return the path as is
+        return PathBuf::from(path);
+    }
     PathBuf::from(audio_base).join(path).join("audio.16.wav")
 }
 

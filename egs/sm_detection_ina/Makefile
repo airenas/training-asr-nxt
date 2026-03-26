@@ -13,6 +13,7 @@ output_dir?=./.data
 cache_dir=./../../.cache
 runner?=../../runner/target/release/runner
 zipper?=../../runner/target/release/zipper
+vad?=../../runner/target/release/vad
 workers?=4
 minimum_memory?=10GB
 RUST_LOG?=trace
@@ -38,5 +39,15 @@ run/runner-wrk: | $(output_dir)
 		--cmd "python local/wrk_detect_smn.py" \
 		--output-files=audio.ina_segments --minimum-memory $(minimum_memory) --source $(source) 
 .PHONY: run/runner-wrk
+run/runner-wrk/liepa3: 
+	$(runner-wrk) --input-base "" --workers $(workers) \
+		--cmd "python local/wrk_detect_smn.py" \
+		--output-files=audio.ina_segments --minimum-memory $(minimum_memory) --source $(source) 
+.PHONY: run/runner-wrk/liepa3
+run/runner-wrk/vad/liepa3: 
+	$(runner-wrk) --input-base "" --workers $(workers) \
+		--cmd "$(vad) --input-model $(vad_model)" \
+		--output-files=vad.json --minimum-memory $(minimum_memory) --source $(source) 
+.PHONY: run/runner-wrk/vad/liepa3
 
 .EXPORT_ALL_VARIABLES:

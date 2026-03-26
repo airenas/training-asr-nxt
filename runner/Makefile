@@ -3,6 +3,8 @@ workers?=4
 PYTHONPATH=./../
 LOG_LEVEL?=info
 CUDA_VISIBLE_DEVICES=
+SHERPA_ONNX_LIB_DIR?=
+
 ###############################################################################
 run:
 	RUST_LOG=trace cargo run --bin runner -- --input ../test1 --output \
@@ -10,9 +12,22 @@ run:
 	--cmd "python ../egs/sm_detection_ina/local/detect_smn.py --input {input} --output {output}"
 .PHONY: run
 ###############################################################################
+# to build vad we need build sherpa-onnx locally and set SHERPA_ONNX_LIB_DIR to the folder with libonnxruntime.so
+# export SHERPA_ONNX_LIB_DIR=/home/airenas/projects/sherpa-onnx/build/lib
+# sherpa build
+# mkdir build && cd build && \
+#  cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release \
+#           -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
+#           -DSHERPA_ONNX_ENABLE_TTS=OFF \
+#           -DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF \
+#           -DSHERPA_ONNX_BUILD_C_API_EXAMPLES=OFF \
+#           -DSHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE=OFF \
+#           -DSHERPA_ONNX_ENABLE_WEBSOCKET=ON && \
+#  cmake --build .  -j
+###############################################################################
 build/local: 
 	cargo build --release --bin runner --bin zipper --bin db-filler --bin file-to-db --bin db-to-file \
-	--bin collect-jsonl --bin snipper-ws --bin fs-runner --bin runner-wrk
+	--bin collect-jsonl --bin snipper-ws --bin fs-runner --bin runner-wrk --bin vad
 .PHONY: build/local
 ###############################################################################
 run/zipper:

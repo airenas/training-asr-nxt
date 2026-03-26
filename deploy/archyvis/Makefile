@@ -1,6 +1,6 @@
 -include Makefile.options
 SSH_CMD=ssh -p $(port) -t $(user)@$(server)
-RSYNC_CMD=rsync -e "ssh -p $(port)"
+RSYNC_CMD=rsync -e "ssh -p $(port)" -avz
 RSYNC_REMOTE_CMD=rsync -r -P
 #########################################################################
 ssh:
@@ -31,6 +31,8 @@ copy/scripts:
 	scp -P $(port) ../../runner/target/release/runner-wrk $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/fs-runner $(user)@$(server):~/train-asr/bin/
+	$(RSYNC_CMD) ../../runner/target/release/vad $(user)@$(server):~/train-asr/bin/
+	$(RSYNC_CMD) $(onnx_lib)/* $(user)@$(server):~/train-asr/bin/onnx/
 
 #########################################################################
 dwn/db: | ../../.backup/
