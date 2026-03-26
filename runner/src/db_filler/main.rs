@@ -35,6 +35,9 @@ struct Args {
     /// Audio base dir
     #[arg(long, env, default_value = "")]
     audio_base: String,
+    /// Use original file location in db
+    #[arg(long, env, default_value_t = false)]
+    use_original_location: bool,
     /// Prefix to add
     #[arg(long, env, default_value = "")]
     prefix: String,
@@ -140,6 +143,7 @@ fn main_int(args: Args) -> anyhow::Result<()> {
         let failed_count = failed_count.clone();
         let prefix = args.prefix.clone();
         let source = args.source.clone();
+        let use_original_location = args.use_original_location;
 
         handles.push(thread::spawn(move || {
             for file in rx.iter() {
@@ -153,7 +157,11 @@ fn main_int(args: Args) -> anyhow::Result<()> {
                         file_name = format!("{}/{}", prefix, file_name);
                     }
                     tracing::debug!(worker_index, file_name, "Processing file");
-                    let audio_file_name = make_audio_name(&audio_base, &file_name);
+                    let mut audio_file_name = make_audio_name(&audio_base, &file_name);
+                    if use_original_location {
+                        file_name = file.to_string_lossy().to_string();
+                        audio_file_name = file_name.clone().into();
+                    };
 
                     let id = format!("{:x}", md5::compute(&file_name));
                     let duration_in_sec = get_duration(&audio_file_name).context(format!(

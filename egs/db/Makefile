@@ -10,6 +10,10 @@ workers?=4
 file?=audio.ina_segments
 file-to-db?=../../runner/target/release/file-to-db
 filler?=../../runner/target/release/db-filler
+
+log?=INFO
+python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
+dry_run?=1
 ########################################################################################################
 ## print usage information
 help:
@@ -34,6 +38,12 @@ run/filler/voxlingua:
 run/filler/voxpopuli: 
 	$(filler) --input=$(voxpopuli_dir) --workers=$(workers) --prefix voxpopuli --audio-base=$(output_dir) --extensions=m4a,wav,mp3,ogg --source voxpopuli
 .PHONY: run/runner/voxpopuli
+run/filler/liepa3: 
+	$(filler) --input=$(liepa3_dir) --workers=$(workers)  --audio-base=$(output_dir) --use-original-location --extensions=wav --source liepa3
+.PHONY: run/runner/liepa3
+move/liepa3/speaker-sample:
+	$(python_cmd) local/move_folder_source.py --input-source liepa3 --target-source liepa3-speaker --n 5 --dry-run $(dry_run)
+.PHONY: move/liepa3/speaker-sample
 ########################################################################################################
 run/to-db: 
 	$(file-to-db) --workers=$(workers) --input-base=$(output_dir) --names=$(file)
