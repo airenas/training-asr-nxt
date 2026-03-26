@@ -44,6 +44,9 @@ run/filler/liepa3:
 move/liepa3/speaker-sample:
 	$(python_cmd) local/move_folder_source.py --input-source liepa3 --target-source liepa3-speaker --n 5 --dry-run $(dry_run)
 .PHONY: move/liepa3/speaker-sample
+make/liepa3/speaker-rttm:
+	$(python_cmd) local/make_one_speaker_from_vad.py --source liepa3-speaker --dry-run $(dry_run)
+.PHONY: move/liepa3/speaker-rttm
 ########################################################################################################
 run/to-db: 
 	$(file-to-db) --workers=$(workers) --input-base=$(output_dir) --names=$(file)

@@ -118,14 +118,13 @@ def main(argv):
                 logger.info(f"loaded speakers: {len(speakers)}")
                 for speaker in speakers:
                     logger.info(f"Speaker: {speaker}")
-                    segments = get_speaker_segments_for_embedding(annotations, speaker)
+                    segments = get_speaker_segments_for_embedding(annotations, speaker, min_segment_duration=1)
                     if len(segments) > 0:
                         logger.info(f"Speaker {speaker} segments: {len(segments)}")
                         sp_emb = calc_embedding(model, params, segments)
                         res[speaker] = sp_emb
-
-            logger.info(f"got result {len(res)} speakers")
-
+            if len(res) == 0:
+                logger.warn(f"No embeddings calculated for rttm file {rttm_file}")
             with open(output_file, "w") as f:
                 for k, v in res.items():
                     f.write(json.dumps({"sp": k, "emb": v.tolist()}, ensure_ascii=False) + "\n")

@@ -36,6 +36,13 @@ run/runner-wrk: | $(output_dir)
 		--input-files=audio.rttm
 .PHONY: run/runner-wrk
 
+run/runner-wrk/on-same-wav: 
+	$(runner-wrk) --input-base "" --workers $(workers) \
+		--cmd "python local/wrk_embeddings.py" \
+		--output-files=speaker.embeddings.jsonl --minimum-memory $(minimum_memory) --source $(source) \
+		--input-files=audio.rttm
+.PHONY: run/runner-wrk
+
 .data:
 	mkdir -p $@
 

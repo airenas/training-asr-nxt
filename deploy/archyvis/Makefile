@@ -20,8 +20,8 @@ copy/scripts:
 	scp -P $(port) -r ../../preparation  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../Makefile  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../requirements.txt  $(user)@$(server):~/train-asr/
-	scp -P $(port) -r ./remote/*  $(user)@$(server):~/train-asr/
-	scp -P $(port) -r ../../egs  $(user)@$(server):~/train-asr/
+	$(RSYNC_CMD) -r ./remote/*  $(user)@$(server):~/train-asr/
+	$(RSYNC_CMD) ../../egs  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../runner/target/release/zipper $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/db-filler $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/file-to-db $(user)@$(server):~/train-asr/bin/
