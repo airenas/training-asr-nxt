@@ -91,6 +91,14 @@ def calc_embedding(model, params: Params, segments):
     return res
 
 
+def get_wanted_min_segment_len(params):
+    audio = params.get_audio()
+    duration = audio.waveform.shape[1] / audio.sample_rate
+    if duration < 30:
+        return 1.0
+    return 3.0
+
+
 def main(argv):
     logger.info("Starting")
 
@@ -116,15 +124,17 @@ def main(argv):
                 logger.info(f"loaded rttm lines: {len(annotations)}")
                 speakers = set(annotations.labels())
                 logger.info(f"loaded speakers: {len(speakers)}")
+                min_segment_len = get_wanted_min_segment_len(params)
+                logger.info(f"min segment len for embedding: {min_segment_len:.2f}s")
                 for speaker in speakers:
                     logger.info(f"Speaker: {speaker}")
-                    segments = get_speaker_segments_for_embedding(annotations, speaker, min_segment_duration=1)
+                    segments = get_speaker_segments_for_embedding(annotations, speaker, min_segment_duration=min_segment_len)
                     if len(segments) > 0:
                         logger.info(f"Speaker {speaker} segments: {len(segments)}")
                         sp_emb = calc_embedding(model, params, segments)
                         res[speaker] = sp_emb
             if len(res) == 0:
-                logger.warn(f"No embeddings calculated for rttm file {rttm_file}")
+                logger.warning(f"No embeddings calculated for rttm file {rttm_file}")
             with open(output_file, "w") as f:
                 for k, v in res.items():
                     f.write(json.dumps({"sp": k, "emb": v.tolist()}, ensure_ascii=False) + "\n")
