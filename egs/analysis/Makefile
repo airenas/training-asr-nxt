@@ -10,6 +10,7 @@ RUST_LOG?=trace
 log?=INFO
 python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
 skip_input?=0
+sources?=--source liepa3-speaker
 ############################################################
 $(output_dir) $(l_output_dir):
 	mkdir -p $@
@@ -31,11 +32,11 @@ $(l_output_dir)/speaker.wav : $(l_output_dir)/speaker_out.json
 prepare/speaker-wav: $(l_output_dir)/speaker.wav
 .PHONY: prepare/speaker-wav
 ############################################################
-calc/speaker-times: 
-	$(python_cmd) local/speaker_in_file.py
+calc/speaker/times: 
+	$(python_cmd) local/speaker_in_file.py $(sources)
 .PHONY: calc/speaker-times
 ############################################################
-calc/speaker-lang:
+calc/speaker/lang:
 	$(python_cmd) local/speaker_lang_in_file.py
 .PHONY: calc/speaker-lang
 ############################################################

@@ -28,6 +28,8 @@ $(l_output_dir)/%-gender.jsonl: $(l_output_dir)/%-clusters.jsonl | $(l_output_di
 	mv $@_ $@
 detect/gender/liepa3-speaker: $(l_output_dir)/liepa3-speaker-gender.jsonl
 .PHONY: detect/gender/liepa3-speaker
+detect/gender/all: $(l_output_dir)/all-gender.jsonl
+.PHONY: detect/gender/all
 ############################################################
 clean:
 	rm -rf $(l_output_dir)

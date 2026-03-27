@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS file_speakers (
     speaker TEXT NOT NULL,   -- the speaker in file
     global_speaker TEXT,   -- grouped speaker ID across files
     duration_in_sec REAL, 
-    duration_avg_in_sec REAL, 
+    segments INTEGER, -- number of segments in a file
     language CHAR(3),
     gender CHAR(1),
     PRIMARY KEY (file_id, speaker)
