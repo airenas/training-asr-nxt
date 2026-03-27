@@ -46,14 +46,20 @@ run/runner-wrk/on-same-wav:
 .data:
 	mkdir -p $@
 
-.data/all.embeddings.jsonl:  | .data
-	$(collector) --name speaker.embeddings.jsonl --output $@_
+.data/emb-%.jsonl:  | .data
+	$(collector) --name speaker.embeddings.jsonl --output $@_ --source $*
 	mv $@_ $@
-collect: .data/all.embeddings.jsonl
+
+.data/emb-all.jsonl: .data/emb-08kHz.jsonl .data/emb-16kHz.jsonl .data/emb-crawl.jsonl .data/emb-voxlingua.jsonl .data/emb-voxpopuli.jsonl | .data
+	cat $^ > $@
+collect/liepa3-speaker: .data/emb-liepa3-speaker.jsonl
+.PHONY: collect/liepa3-speaker
+
+collect: .data/emb-all.jsonl
 .PHONY: collect
 
-.data/clustered.jsonl: .data/all.embeddings.jsonl | .data
-	$(python_cmd) local/cluster.py --input .data/all.embeddings.jsonl --output $@
+.data/clustered.jsonl: .data/emb-all.jsonl | .data
+	$(python_cmd) local/cluster.py --input .data/emb-all.jsonl --output $@
 cluster: .data/clustered.jsonl
 .PHONY: cluster
 

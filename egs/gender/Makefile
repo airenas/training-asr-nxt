@@ -3,9 +3,9 @@
 log?=INFO
 python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
 cluster_file?=../speaker_embeddings/.data/clustered.jsonl
-gender_model?=$(l_output_dir)/model.json
 ############################################################
 l_output_dir?=./.data
+gender_model?=$(l_output_dir)/model.json
 ############################################################
 $(output_dir) $(l_output_dir):
 	mkdir -p $@
@@ -22,12 +22,12 @@ $(l_output_dir)/model.json: $(l_output_dir)/gender_train.jsonl | $(l_output_dir)
 train: $(l_output_dir)/model.json
 .PHONY: train
 ############################################################
-$(l_output_dir)/cluster_gender.jsonl: | $(output_dir)
-	$(python_cmd) local/detect.py --input-cluster $(cluster_file) --output $@_ \
+$(l_output_dir)/%-gender.jsonl: $(l_output_dir)/%-clusters.jsonl | $(l_output_dir)
+	$(python_cmd) local/detect.py --input-cluster $(l_output_dir)/$*-clusters.jsonl --output $@_ \
 	--model $(gender_model)
 	mv $@_ $@
-run/detect/gender: $(l_output_dir)/cluster_gender.jsonl
-.PHONY: run/detect/gender
+detect/gender/liepa3-speaker: $(l_output_dir)/liepa3-speaker-gender.jsonl
+.PHONY: detect/gender/liepa3-speaker
 ############################################################
 clean:
 	rm -rf $(l_output_dir)

@@ -65,6 +65,9 @@ def main(argv):
                     t_res = set()
                     for item in test:
                         emb = get_speaker_embedding(conn, item["f"], item["sp"])
+                        if emb is None:
+                            logger.warn(f"embedding not found for {item['f']} {item['sp']}")
+                            continue
                         label = model.predict(emb=emb, threshold_diff=0.2)
                         output_f.write(json.dumps({
                             "f": item["f"],

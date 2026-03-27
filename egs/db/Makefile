@@ -25,6 +25,8 @@ run:
 	docker compose up -d 
 .PHONY: run
 ########################################################################################################
+.data:
+	mkdir -p $@
 run/filler: 
 	$(filler) --input=$(corpus_dir) --workers=$(workers) --audio-base=$(output_dir) --extensions=m4a
 .PHONY: run/runner
@@ -44,9 +46,17 @@ run/filler/liepa3:
 move/liepa3/speaker-sample:
 	$(python_cmd) local/move_folder_source.py --input-source liepa3 --target-source liepa3-speaker --n 5 --dry-run $(dry_run)
 .PHONY: move/liepa3/speaker-sample
+########################################################################################################
 make/liepa3/speaker-rttm:
 	$(python_cmd) local/make_one_speaker_from_vad.py --source liepa3-speaker --dry-run $(dry_run)
 .PHONY: move/liepa3/speaker-rttm
+########################################################################################################
+make/liepa3-speaker/cluster: | .data
+	$(python_cmd) local/source_to_speaker_cluster.py --source liepa3-speaker --output .data/liepa3-speaker-clusters.jsonl
+.PHONY: make/liepa3-speaker/cluster
+make/liepa3/cluster: | .data
+	$(python_cmd) local/source_to_speaker_cluster.py --source liepa3-speaker --source liepa3 --output .data/liepa3-clusters.jsonl
+.PHONY: make/liepa3/cluster
 ########################################################################################################
 run/to-db: 
 	$(file-to-db) --workers=$(workers) --input-base=$(output_dir) --names=$(file)

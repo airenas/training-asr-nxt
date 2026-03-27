@@ -25,13 +25,14 @@ def load_embeddings(conn, file_id: str):
     if emb_row:
         lang_bytes = emb_row[0]
         return parse_emb(bytes(lang_bytes))
-
-    raise ValueError(f"No lang found for file id {file_id}")
+    return None
 
 
 def get_speaker_embedding(conn, file_id, speaker):
     embs = load_embeddings(conn=conn, file_id=file_id)
+    if not embs:
+        return None
     for spk, emb in embs.items():
         if spk == speaker:
             return emb
-    raise ValueError(f"No embedding found for file {file_id} speaker {speaker}")
+    return None
