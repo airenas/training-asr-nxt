@@ -18,8 +18,11 @@ CREATE TABLE IF NOT EXISTS kv (
 
 CREATE TABLE IF NOT EXISTS file_speakers (
     file_id VARCHAR(64) NOT NULL,     
-    speaker_id VARCHAR(64) NOT NULL,   -- ID of the speaker
-    duration_in_sec DOUBLE PRECISION, 
-    language TEXT NOT NULL DEFAULT '',
-    PRIMARY KEY (file_id, speaker_id)
+    speaker TEXT NOT NULL,   -- the speaker in file
+    global_speaker TEXT,   -- grouped speaker ID across files
+    duration_in_sec REAL, 
+    duration_avg_in_sec REAL, 
+    language CHAR(3),
+    gender CHAR(1),
+    PRIMARY KEY (file_id, speaker)
 );
