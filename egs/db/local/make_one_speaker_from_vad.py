@@ -67,7 +67,6 @@ def main(argv):
                 )
                 batch_count += 1
 
-                # 🔁 batch commit
                 if batch_count >= BATCH_SIZE:
                     conn.commit()
                     batch_count = 0
