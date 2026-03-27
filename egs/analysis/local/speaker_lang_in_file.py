@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -6,14 +7,8 @@ from typing import Dict
 import psycopg2
 from tqdm import tqdm
 
+from egs.analysis.local.speaker_in_file import read_files_table
 from preparation.logger import logger
-
-
-def read_files_table(conn):
-    with conn.cursor() as cur:
-        cur.execute("SELECT id FROM files")
-        rows = cur.fetchall()
-    return [row[0] for row in rows]
 
 
 def calculate_speaker_durations(rttm):
@@ -26,9 +21,9 @@ def calculate_speaker_durations(rttm):
 
 def upsert_file_speaker(conn, file_id: str, speaker_id: str, language: str):
     sql = """
-    INSERT INTO file_speakers (file_id, speaker_id, language)
+    INSERT INTO file_speakers (file_id, speaker, language)
     VALUES (%s, %s, %s)
-    ON CONFLICT (file_id, speaker_id)
+    ON CONFLICT (file_id, speaker)
     DO UPDATE SET language = EXCLUDED.language
     """
     with conn.cursor() as cur:
@@ -90,21 +85,23 @@ def parse_lang(lang_bytes: bytes):
 
 def main(argv):
     logger.info("Starting")
-    # parser = argparse.ArgumentParser(description="Starting prepare user segments")
-    # args = parser.parse_args(args=argv)
+    parser = argparse.ArgumentParser(description="Starting prepare speaker file table")
+    parser.add_argument("--source", action='append', required=True, help="Input source(s)")
+    args = parser.parse_args(args=argv)
 
     DB_URL = os.environ["DB_URL"]
     with psycopg2.connect(dsn=DB_URL) as conn:
-
+        conn.autocommit = False
         logger.info(f"Reading file ids")
-        files = read_files_table(conn)
+        files = read_files_table(conn, args.source)
         logger.info(f"Got {len(files)} files")
         for (idx, file_id) in enumerate(tqdm(files, desc="Processing files")):
-            if idx % 100:
+            if idx % 1000 == 0:
                 conn.commit()
             langs = load_lang(conn, file_id)
             for speaker_id, lang in langs.items():
                 upsert_file_speaker(conn, file_id, speaker_id, lang)
+        conn.commit()
 
     logger.info(f"Done")
 

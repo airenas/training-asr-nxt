@@ -32,13 +32,21 @@ $(l_output_dir)/speaker.wav : $(l_output_dir)/speaker_out.json
 prepare/speaker-wav: $(l_output_dir)/speaker.wav
 .PHONY: prepare/speaker-wav
 ############################################################
-calc/speaker/times: 
+insert/speaker/times:
 	$(python_cmd) local/speaker_in_file.py $(sources)
-.PHONY: calc/speaker-times
+.PHONY: insert/speaker/times
 ############################################################
-calc/speaker/lang:
-	$(python_cmd) local/speaker_lang_in_file.py
-.PHONY: calc/speaker-lang
+update/speaker/lang:
+	$(python_cmd) local/speaker_lang_in_file.py $(sources)
+.PHONY: update/speaker/lang
+############################################################
+update/speaker/cluster:
+	$(python_cmd) local/speaker_cluster_in_file.py --clusters $(clusters)
+.PHONY: update/speaker/cluster
+############################################################
+update/speaker/gender:
+	$(python_cmd) local/speaker_gender_in_file.py --clusters $(clusters) --genders $(genders)
+.PHONY: update/speaker/gender
 ############################################################
 $(l_output_dir)/global_speaker.jsonl:
 	$(python_cmd) local/global_speaker_durations.py --input ../speaker_embeddings/.data/clustered.jsonl --output $(l_output_dir)/global_speaker.jsonl
