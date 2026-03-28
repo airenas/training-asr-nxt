@@ -47,7 +47,7 @@ def main(argv):
                 if not line.strip():
                     continue
                 data = json.loads(line)
-                name = "spk_" + hashlib.md5(line.encode()).hexdigest()[:6]
+                name = "s_" + hashlib.md5(line.encode()).hexdigest()[:10]
                 update_global_speaker(conn, data, name)
                 if i % 10 == 0:
                     conn.commit()
