@@ -64,7 +64,11 @@ run/label/gender: | $(l_output_dir)
 ############################################################
 run/cluster/analysis: 
 	$(python_cmd) local/cluster_analysis.py --input ../speaker_embeddings/.data/clustered.jsonl \
-	--audio-url http://localhost:8000/concat --skip-input $(skip_input)	
+	--audio-url http://localhost:8000/concat --skip-input $(skip_input)
+############################################################
+run/speaker/analysis:
+	$(python_cmd) local/speaker_analysis.py \
+	--audio-url http://localhost:8000/concat
 ############################################################
 clean: 
 	rm -f $(l_output_dir)/speaker_out.json
