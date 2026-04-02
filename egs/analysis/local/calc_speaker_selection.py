@@ -3,6 +3,7 @@ import json
 import random
 import sys
 from collections import defaultdict
+from dataclasses import asdict
 
 from tqdm import tqdm
 
@@ -10,20 +11,9 @@ from egs.analysis.local.prepare_speaker_rttm import FinalSegment
 from preparation.logger import logger
 
 
-def save(f, id, source, res, file_speakers):
-    for s in res:
-        fs = file_speakers.get(id, {}).get(s.speaker, {})
-        obj = {
-            "source": source,
-            "id": id,
-            "speaker": s.speaker,
-            "gs": fs.get("global_speaker", ""),
-            "gender": fs.get("gender", ""),
-            "lang": fs.get("language", ""),
-            "start": round(s.start, 3),
-            "end": round(s.end, 3),
-        }
-        f.write(json.dumps(obj) + "\n")
+def save(f, segments):
+    for s in segments:
+        f.write(json.dumps(asdict(s)) + "\n")
 
 
 def skip_less_than_in_file(segments, secs):
@@ -51,6 +41,8 @@ def main(argv):
     parser.add_argument("--output", nargs='?', required=True, help="File segments to output for training")
     parser.add_argument("--take-up", nargs='?', default=3600, type=float,
                         help="Max duration to take per speaker in seconds")
+    parser.add_argument("--take-up-crawl", nargs='?', default=3000, type=float,
+                        help="Max duration to take per speaker in seconds from crawl source")
     parser.add_argument("--dry-run", nargs='?', default=1, type=int,
                         help="If 1, just calc info")
 
@@ -59,7 +51,8 @@ def main(argv):
     logger.info(f"Input         : {args.input}")
     logger.info(f"Output        : {args.output}")
     logger.info(f"Dry run       : {args.dry_run}")
-    logger.info(f"Take up       : {args.take_up} seconds per speaker")
+    logger.info(f"Take up to    : {args.take_up} seconds per speaker")
+    logger.info(f"Take up to from crawl : {args.take_up_crawl} seconds per speaker")
 
     logger.info("iterate starting")
 
@@ -89,23 +82,33 @@ def main(argv):
         "speakers": set(),
     })
 
-    for gs, segments in tqdm(items.items()):
-        segments = skip_less_than_in_file(segments=segments, secs=3)
-        random.shuffle(segments)
-        duration = 0.0
-        selected = []
-        for seg in segments:
-            dur = seg.end - seg.start
-            if duration + dur <= args.take_up:
-                selected.append(seg)
-                duration += dur
-            else:
-                break
-        for seg in selected:
-            key = (seg.source, seg.gender)
-            stats[key]["duration"] += seg.end - seg.start
-            stats[key]["segments"] += 1
-            stats[key]["speakers"].add(seg.gs)
+    with open(args.output, "w", encoding="utf-8") as output_f:
+        for gs, segments in tqdm(items.items()):
+            segments = skip_less_than_in_file(segments=segments, secs=3)
+            random.shuffle(segments)
+            duration = 0.0
+            duration_crawl = 0.0
+            selected = []
+            for seg in segments:
+                dur = seg.end - seg.start
+                if seg.source == "crawl" and duration_crawl + dur > args.take_up_crawl:
+                    continue
+                if duration + dur <= args.take_up:
+                    selected.append(seg)
+                    duration += dur
+                    if seg.source == "crawl":
+                        duration_crawl += dur
+                else:
+                    if duration + 30 > args.take_up:  # almost full, can leave now
+                        break
+            for seg in selected:
+                key = (seg.source, seg.gender)
+                stats[key]["duration"] += seg.end - seg.start
+                stats[key]["segments"] += 1
+                stats[key]["speakers"].add(seg.gs)
+            if args.dry_run == 0:
+                selected = sorted(selected, key=lambda s: (s.id, s.start), )
+                save(f=output_f, segments=selected)
 
     total_duration = sum(s["duration"] for s in stats.values())
     total_segments = sum(s["segments"] for s in stats.values())

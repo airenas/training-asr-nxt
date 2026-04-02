@@ -14,6 +14,8 @@ from preparation.logger import logger
 from preparation.utils.sm_segments import parse_segments, SegmentLabel
 
 MIN_SEC_IN_FILE = 3
+MIN_SEGMENT = 0.1
+MAX_SILENCE = 0.3
 
 MUSIC = SegmentLabel.MUSIC.value
 
@@ -76,7 +78,10 @@ def parse_ina_to_list(ina_segments):
 
 def calc_gap(end, start, extend_end: bool = False, extend_start: bool = False):
     gap = start - end
-    extend = min(gap / 2, 0.5)
+    ends = 1
+    if extend_end and extend_start:
+        ends = 2
+    extend = min(gap / ends, MAX_SILENCE)
     if extend_end:
         end += extend
     if extend_start:
@@ -94,6 +99,8 @@ def prepare_segments(seg: List[Segment], duration: float) -> List[Segment]:
             at = cur.end
             continue
         if cur.end < at:
+            continue
+        if cur.end - cur.start  < MIN_SEGMENT:  # skip very short segments
             continue
         if cur.start < at:
             cur.start = at
@@ -126,7 +133,7 @@ def join_same(seg: List[Segment]) -> List[Segment]:
         if not prev:
             res.append(s)
             continue
-        if s.speaker == prev.speaker and s.start - prev.end < 0.2:
+        if s.speaker == prev.speaker and s.start - prev.end < MAX_SILENCE:
             prev.end = s.end
             continue
         res.append(s)
