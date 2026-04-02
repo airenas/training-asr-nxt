@@ -39,18 +39,22 @@ class Segment:
         return res
 
 
-def load_segments(input_file):
+def load_segments(input_file) -> list[Segment]:
     dir_name = os.path.dirname(input_file)
     segments_file = os.path.join(dir_name, "audio.ina_segments")
 
     try:
         with open(segments_file, 'r', encoding='utf-8') as f:
             content = f.read()
-        segments = re.findall(r'\["(.*?)", ([\d.]+), ([\d.]+)\]', content)
-        parsed_segments = [Segment(label=label, start=float(start), end=float(end)) for label, start, end in segments]
-        return parsed_segments
+        return parse_segments(content)
     except Exception as e:
         raise RuntimeError(f"Failed to load segments from {segments_file}: {e}")
+
+
+def parse_segments(content) -> list[Segment]:
+    segments = re.findall(r'\["(.*?)", ([\d.]+), ([\d.]+)\]', content)
+    parsed_segments = [Segment(label=label, start=float(start), end=float(end)) for label, start, end in segments]
+    return parsed_segments
 
 
 def select_speech(segments):

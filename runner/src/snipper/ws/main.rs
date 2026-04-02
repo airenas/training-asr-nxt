@@ -85,7 +85,7 @@ async fn concat_handler(
     Json(mut segments): Json<Vec<Segment>>,
 ) -> Response {
     for seg in &mut segments {
-        seg.file = format!("{}/{}", state.input_base, seg.file);
+        seg.file = meke_file_name(&state.input_base, &seg.file);
     }
 
     match concat_segments(&segments) {
@@ -102,4 +102,12 @@ async fn concat_handler(
             (axum::http::StatusCode::BAD_REQUEST, format!("error: {e}")).into_response()
         },
     }
+}
+
+fn meke_file_name(input_base: &str, file: &str) -> String {
+    if file.starts_with('/') {
+        return file.to_string();
+    }
+    format!("{}/{}", input_base, file)
+    
 }

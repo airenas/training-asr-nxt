@@ -165,14 +165,18 @@ def make_segments(conn, f, speaker):
         row = cur.fetchone()
     if not row:
         raise ValueError(f"No file id {f}")
+
     path = row[1]
+    if not os.path.isabs(path):
+        path = f"{path}/audio.16.wav",
+
     rttm = load_rttm(conn, f)
     segments = rttm.get(speaker, [])
     if not segments:
         raise ValueError(f"No segment for file id {f} speaker {speaker}")
     for s in segments:
         entry = {
-            "file": f"{path}/audio.16.wav",
+            "file": path,
             "from": s["from"],
             "to": s["to"],
         }

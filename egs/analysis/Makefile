@@ -11,6 +11,7 @@ log?=INFO
 python_cmd=PYTHONPATH=./../../ LOG_LEVEL=$(log) python
 skip_input?=0
 sources?=--source liepa3-speaker
+dry_run?=1
 ############################################################
 $(output_dir) $(l_output_dir):
 	mkdir -p $@
@@ -69,6 +70,11 @@ run/cluster/analysis:
 run/speaker/analysis:
 	$(python_cmd) local/speaker_analysis.py \
 	--audio-url http://localhost:8000/concat
+############################################################
+prepare/speaker-rttm:
+	$(python_cmd) local/prepare_speaker_rttm.py --dry-run $(dry_run) --output .data/audio.segments.jsonl
+calc/speaker-selection:
+	$(python_cmd) local/calc_speaker_selection.py --input .data/audio.segments.jsonl	 --dry-run $(dry_run) --output .data/final.segments.jsonl	
 ############################################################
 clean: 
 	rm -f $(l_output_dir)/speaker_out.json
