@@ -7,6 +7,7 @@ from multiprocessing import JoinableQueue, Process
 from pathlib import Path
 from typing import List
 
+import botocore
 import numpy as np
 import soundfile as sf
 from tqdm import tqdm
@@ -64,6 +65,50 @@ def build_chunks(files, max_sec):
         yield Chunk(current_source, source_idx, current_items)
 
 
+class SimpleAudioWriter:
+    def __init__(self, output_dir, sample_rate):
+        self.output_dir = output_dir
+        self.sample_rate = sample_rate
+
+    def write(self, name, data):
+        output_file = Path(self.output_dir) / name
+        os.makedirs(output_file.parent, exist_ok=True)
+        sf.write(output_file, data, self.sample_rate, subtype="PCM_16")
+        logger.debug(f"Saved {output_file}")
+
+
+class S3AudioWriter:
+    def __init__(self, bucket, sample_rate):
+        import boto3
+        self.bucket = bucket
+        self.sample_rate = sample_rate
+        self.s3_client = boto3.client(
+            "s3",
+            config=botocore.config.Config(
+                retries={"max_attempts": 5, "mode": "standard"}
+            ),
+        )
+        ## check access to bucket
+        self.list_top_files(n=10)
+        logger.info(f"Initialized S3AudioWriter with bucket {bucket}")
+
+    def list_top_files(self, n=10, prefix=""):
+        resp = self.s3_client.list_objects_v2(Bucket=self.bucket, Prefix=prefix, MaxKeys=n)
+        files = []
+        for obj in resp.get("Contents", []):
+            files.append(obj["Key"])
+        return files
+
+    def write(self, name: Path, data):
+        from io import BytesIO
+        output_file = name
+        buffer = BytesIO()
+        sf.write(buffer, data, self.sample_rate, subtype="PCM_16", format="WAV")
+        buffer.seek(0)
+        self.s3_client.upload_fileobj(buffer, self.bucket, str(output_file))
+        logger.debug(f"Saved {output_file} to bucket {self.bucket}")
+
+
 def main(argv):
     logger.info("Starting")
     parser = argparse.ArgumentParser(description="Copy audio to destination from segments")
@@ -85,11 +130,18 @@ def main(argv):
     logger.info(f"Workers       : {args.workers}")
     logger.info(f"Audio Secs    : {args.audio_seconds}")
 
+    file_write = SimpleAudioWriter(args.output_dir, args.sample_rate)
+    if args.bucket:
+        logger.info(f"Using S3AudioWriter with bucket {args.bucket}")
+        file_write = S3AudioWriter(args.bucket, args.sample_rate)
+    else:
+        logger.info(f"Using SimpleAudioWriter with output dir {args.output_dir}")
+
     files = []
     with open(args.input, "r", encoding="utf-8") as f:
         for i, line in enumerate(tqdm(f)):
-            if i > 100000:
-                break
+            # if i > 10000:
+            #     break
             data_dict = json.loads(line)
             segment = FileCuts.from_dict(data_dict)
             files.append(segment)
@@ -107,7 +159,7 @@ def main(argv):
     workers = []
     work_queue = JoinableQueue(maxsize=100)
     for i in range(args.workers):
-        p = Process(target=worker, args=(work_queue, args))
+        p = Process(target=worker, args=(work_queue, args, file_write))
         p.start()
         workers.append(p)
 
@@ -126,7 +178,7 @@ def main(argv):
     logger.info(f"Done")
 
 
-def worker(work_queue, args):
+def worker(work_queue, args, file_writer):
     logger.info("Worker started")
 
     base_audio_path = Path(args.audio_base)
@@ -140,10 +192,7 @@ def worker(work_queue, args):
 
         try:
             bucket_id = chunk.index // 1000
-            bucket_dir = Path(args.output_dir) / chunk.source / f"{bucket_id:03d}"
-            os.makedirs(bucket_dir, exist_ok=True)
-            f_name = f"{chunk.source}_{chunk.index:06d}.wav"
-            output_file = bucket_dir / f_name
+            output_file = Path(chunk.source) / f"{bucket_id:03d}" / f"{chunk.source}_{chunk.index:06d}.wav"
             parts = []
             for fc in chunk.items:
                 a_path = Path(fc.path)
@@ -160,12 +209,12 @@ def worker(work_queue, args):
                     parts.append(data[start:end])
 
             if not parts:
-                logger.warning(f"Empty chunk {f_name}")
+                logger.warning(f"Empty chunk {output_file}")
                 continue
 
             combined = np.concatenate(parts)
 
-            sf.write(output_file, combined, args.sample_rate, subtype="PCM_16")
+            file_writer.write(output_file, combined)
 
             logger.debug(f"Saved {output_file}")
 

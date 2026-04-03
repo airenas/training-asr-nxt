@@ -95,10 +95,10 @@ calc/file-cuts: $(l_output_dir)/file.cuts.jsonl
 ############################################################
 audio_seconds?=600
 audio_output_dir?=./.data/audio
-bucket?=train-asr
+audio_output_bucket?=
 $(l_output_dir)/.files.done: $(l_output_dir)/file.cuts.jsonl
 	$(python_cmd) local/copy_audio.py --input $(l_output_dir)/file.cuts.jsonl --output_dir $(audio_output_dir) \
-	--workers $(workers) --audio-seconds $(audio_seconds) --bucket $(bucket) --audio-base $(output_dir)
+	--workers $(workers) --audio-seconds $(audio_seconds) --bucket $(audio_output_bucket) --audio-base $(output_dir)
 # 	touch $@
 copy/audio: $(l_output_dir)/.files.done
 .PHONY: copy/audio
