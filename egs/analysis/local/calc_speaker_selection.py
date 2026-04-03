@@ -4,6 +4,7 @@ import random
 import sys
 from collections import defaultdict
 from dataclasses import asdict
+from typing import List
 
 from tqdm import tqdm
 
@@ -11,7 +12,7 @@ from egs.analysis.local.prepare_speaker_rttm import FinalSegment
 from preparation.logger import logger
 
 
-def save(f, segments):
+def save(f, segments: List[FinalSegment]):
     for s in segments:
         f.write(json.dumps(asdict(s)) + "\n")
 
@@ -41,8 +42,10 @@ def main(argv):
     parser.add_argument("--output", nargs='?', required=True, help="File segments to output for training")
     parser.add_argument("--take-up", nargs='?', default=3600, type=float,
                         help="Max duration to take per speaker in seconds")
-    parser.add_argument("--take-up-crawl", nargs='?', default=3000, type=float,
-                        help="Max duration to take per speaker in seconds from crawl source")
+    parser.add_argument("--take-up-crawl-male", nargs='?', default=3000, type=float,
+                        help="Max duration to take per speaker in seconds from crawl source for male")
+    parser.add_argument("--take-up-crawl-female", nargs='?', default=3000, type=float,
+                        help="Max duration to take per speaker in seconds from crawl source for female")
     parser.add_argument("--dry-run", nargs='?', default=1, type=int,
                         help="If 1, just calc info")
 
@@ -52,7 +55,8 @@ def main(argv):
     logger.info(f"Output        : {args.output}")
     logger.info(f"Dry run       : {args.dry_run}")
     logger.info(f"Take up to    : {args.take_up} seconds per speaker")
-    logger.info(f"Take up to from crawl : {args.take_up_crawl} seconds per speaker")
+    logger.info(f"Take up to from crawl male  : {args.take_up_crawl_male} seconds per speaker")
+    logger.info(f"Take up to from crawl female: {args.take_up_crawl_female} seconds per speaker")
 
     logger.info("iterate starting")
 
@@ -91,8 +95,11 @@ def main(argv):
             selected = []
             for seg in segments:
                 dur = seg.end - seg.start
-                if seg.source == "crawl" and duration_crawl + dur > args.take_up_crawl:
-                    continue
+                if seg.source == "crawl":
+                    if seg.gender == "m" and duration_crawl + dur > args.take_up_crawl_male:
+                        continue
+                    if seg.gender == "f" and duration_crawl + dur > args.take_up_crawl_female:
+                        continue
                 if duration + dur <= args.take_up:
                     selected.append(seg)
                     duration += dur

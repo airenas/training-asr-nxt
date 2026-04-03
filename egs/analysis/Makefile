@@ -76,10 +76,11 @@ prepare/speaker-rttm:
 .PHONY: prepare/speaker-rttm	
 ############################################################
 take_up?=3600
-take_up_crawl?=3000	
+take_up_crawl_male?=3000	
+take_up_crawl_female?=3000
 calc/speaker-selection:
 	$(python_cmd) local/calc_speaker_selection.py --input .data/audio.segments.jsonl --dry-run $(dry_run) --output .data/final.segments.jsonl \
-		--take-up $(take_up) --take-up-crawl $(take_up_crawl)
+		--take-up $(take_up) --take-up-crawl-male $(take_up_crawl_male) --take-up-crawl-female $(take_up_crawl_female)
 .PHONY: calc/speaker-selection		
 ############################################################
 clean: 
