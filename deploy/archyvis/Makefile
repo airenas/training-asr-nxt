@@ -17,17 +17,17 @@ ssh/snipper:
 
 copy/scripts:
 	$(SSH_CMD) "mkdir -p train-asr/bin"	
-	scp -P $(port) -r ../../preparation  $(user)@$(server):~/train-asr/
+	$(RSYNC_CMD) -r ../../preparation  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../Makefile  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../requirements.txt  $(user)@$(server):~/train-asr/
 	$(RSYNC_CMD) -r ./remote/*  $(user)@$(server):~/train-asr/
-	$(RSYNC_CMD) ../../egs  $(user)@$(server):~/train-asr/
+	$(RSYNC_CMD) --exclude .data ../../egs  $(user)@$(server):~/train-asr/
 	scp -P $(port) ../../runner/target/release/zipper $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/db-filler $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/file-to-db $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/db-to-file $(user)@$(server):~/train-asr/bin/
-	scp -P $(port) ../../runner/target/release/collect-jsonl $(user)@$(server):~/train-asr/bin/
-	scp -P $(port) ../../runner/target/release/snipper-ws $(user)@$(server):~/train-asr/bin/
+	$(RSYNC_CMD) ../../runner/target/release/collect-jsonl $(user)@$(server):~/train-asr/bin/
+	$(RSYNC_CMD) ../../runner/target/release/snipper-ws $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner-wrk $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/runner $(user)@$(server):~/train-asr/bin/
 	scp -P $(port) ../../runner/target/release/fs-runner $(user)@$(server):~/train-asr/bin/

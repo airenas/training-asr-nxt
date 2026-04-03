@@ -71,18 +71,29 @@ run/speaker/analysis:
 	$(python_cmd) local/speaker_analysis.py \
 	--audio-url http://localhost:8000/concat
 ############################################################
-prepare/speaker-rttm:
-	$(python_cmd) local/prepare_speaker_rttm.py --dry-run $(dry_run) --output .data/audio.segments.jsonl
+$(l_output_dir)/audio.segments.jsonl:
+	$(python_cmd) local/prepare_speaker_rttm.py --dry-run $(dry_run) --output $(l_output_dir)/audio.segments.jsonl_
+	mv $@_ $@
+prepare/speaker-rttm: $(l_output_dir)/audio.segments.jsonl
 .PHONY: prepare/speaker-rttm	
 ############################################################
 take_up?=3600
 take_up_crawl_male?=3000	
-take_up_crawl_female?=3000
-calc/speaker-selection:
-	$(python_cmd) local/calc_speaker_selection.py --input .data/audio.segments.jsonl --dry-run $(dry_run) --output .data/final.segments.jsonl \
+take_up_crawl_female?=3600
+$(l_output_dir)/final.segments.jsonl: $(l_output_dir)/audio.segments.jsonl
+	$(python_cmd) local/calc_speaker_selection.py --input  $(l_output_dir)/audio.segments.jsonl --dry-run $(dry_run) --output  $(l_output_dir)/final.segments.jsonl_ \
 		--take-up $(take_up) --take-up-crawl-male $(take_up_crawl_male) --take-up-crawl-female $(take_up_crawl_female)
+	mv $@_ $@
+calc/speaker-selection: $(l_output_dir)/final.segments.jsonl
 .PHONY: calc/speaker-selection		
+############################################################
+$(l_output_dir)/file.cuts.jsonl: $(l_output_dir)/final.segments.jsonl
+	$(python_cmd) local/calc_file_cuts.py --input $(l_output_dir)/final.segments.jsonl --dry-run $(dry_run) --output $@_
+	mv $@_ $@
+calc/file-cuts: $(l_output_dir)/file.cuts.jsonl
+.PHONY: calc/file-cuts
 ############################################################
 clean: 
 	rm -f $(l_output_dir)/speaker_out.json
 .EXPORT_ALL_VARIABLES:
+	
