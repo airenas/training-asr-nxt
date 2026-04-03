@@ -22,6 +22,14 @@ class FileCuts:
     path: str
     segments: List[Segment]
 
+    @classmethod
+    def from_dict(cls, d: dict):
+        return cls(
+            source=d.get("source", ""),
+            path=d.get("path", ""),
+            segments=[Segment(**s) for s in d.get("segments", [])],
+        )
+
 
 def load_files(conn):
     with conn.cursor() as cur:
