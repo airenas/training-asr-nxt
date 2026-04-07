@@ -214,7 +214,7 @@ def main(argv):
             fc = calc_time(chunk)
             # # crawl_034745.wav
             # for c in chunk:
-            if chunk.source == "08kHz" and chunk.index == 120:
+            if chunk.source == "crawl" and chunk.index == 500:
                 skip = False
                 logger.info(f"Continue from {chunk.source} {chunk.index}")
             if not skip:
@@ -295,6 +295,7 @@ def worker(work_queue, args, file_writer, error_queue):
 
                     info = tarfile.TarInfo(name=output_file)
                     info.size = len(combined)
+                    info.mtime = int(time.time())
                     tar.addfile(tarinfo=info, fileobj=buffer)
 
             tar_buffer.seek(0)
