@@ -209,7 +209,7 @@ def main(argv):
                          "[{elapsed}<{remaining}, {rate_fmt}]") as pbar:
         for chunk in build_tar(build_chunks(files, args.audio_seconds), 30):
             if not error_queue.empty():
-                logger.error("Error in worker")
+                logger.error("Error in worker, stopping main process")
                 break
             fc = calc_time(chunk)
             # # crawl_034745.wav
@@ -221,14 +221,21 @@ def main(argv):
                 work_queue.put(chunk)
             pbar.update(fc / 3600)
 
+    logger.info("Sending exit signals")
     for _ in workers:
         work_queue.put(None)
 
+    logger.info("waiting to finish")
     for p in workers:
         p.join()
 
+    is_err = False
     while not error_queue.empty():
         logger.error(f"Error in worker: {error_queue.get()}")
+        is_err = True
+
+    if is_err:
+        raise RuntimeError("Errors occurred in workers, check logs for details")
 
     logger.info(f"Done")
 
@@ -255,13 +262,20 @@ def worker(work_queue, args, file_writer, error_queue):
 
     ar = AudioReader()
 
+    is_error = False
     while True:
         tar_chunk: TarChunk = work_queue.get()
 
         if tar_chunk is None:
             logger.info("Worker exiting")
             break
+
         tar_name = f"{tar_chunk.source}/{tar_chunk.index:06d}.tar"
+        if is_error:
+            logger.warning(f"Worker skipping due to previous error {tar_name}")
+            work_queue.task_done()
+            continue
+
         try:
             logger.debug(f"got task {tar_name} with {len(tar_chunk.items)} chunks")
 
@@ -306,7 +320,7 @@ def worker(work_queue, args, file_writer, error_queue):
         except Exception as e:
             tb = traceback.format_exc()
             error_queue.put(f"error in {tar_name}: {tb}")
-            return
+            is_error = True
 
         finally:
             work_queue.task_done()
