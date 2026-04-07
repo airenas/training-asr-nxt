@@ -119,7 +119,7 @@ class S3AudioWriter:
         logger.debug(f"Starting upload {output_file} {size_mb:.2f} MB")
         self.s3_client.upload_fileobj(data, self.bucket, str(output_file))
         elapsed = time.perf_counter() - start
-        logger.debug(f"Uploaded {output_file}: {size_mb:.2f} MB in {elapsed:.2f}s ({size_mb / elapsed:.2f} MB/s)")
+        logger.info(f"Uploaded {output_file}: {size_mb:.2f} MB in {elapsed:.2f}s ({size_mb / elapsed:.2f} MB/s)")
 
 
 def calc_time(chunk: TarChunk):
