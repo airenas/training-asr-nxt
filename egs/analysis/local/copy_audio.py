@@ -202,7 +202,7 @@ def main(argv):
         p.start()
         workers.append(p)
 
-    skip = True
+    skip = False
     with tqdm(total=tot_secs / 3600, desc="Copying", unit="h",
               bar_format="{l_bar}{bar}| "
                          "{n:.2f}/{total:.2f} {unit} "
@@ -214,9 +214,9 @@ def main(argv):
             fc = calc_time(chunk)
             # # crawl_034745.wav
             # for c in chunk:
-            if chunk.source == "crawl" and chunk.index == 500:
-                skip = False
-                logger.info(f"Continue from {chunk.source} {chunk.index}")
+            # if chunk.source == "crawl" and chunk.index == 500:
+            #     skip = False
+            #     logger.info(f"Continue from {chunk.source} {chunk.index}")
             if not skip:
                 work_queue.put(chunk)
             pbar.update(fc / 3600)
@@ -307,8 +307,12 @@ def worker(work_queue, args, file_writer, error_queue):
                     sf.write(buffer, combined, sr, subtype="PCM_16", format="WAV")
                     buffer.seek(0)
 
+                    total_samples = len(combined)
+                    total_sec = total_samples / sr
+                    logger.debug(f"Final audio for {output_file}: {total_samples} samples, {total_sec:.2f} seconds")
+
                     info = tarfile.TarInfo(name=output_file)
-                    info.size = len(combined)
+                    info.size = buffer.getbuffer().nbytes
                     info.mtime = int(time.time())
                     tar.addfile(tarinfo=info, fileobj=buffer)
 
