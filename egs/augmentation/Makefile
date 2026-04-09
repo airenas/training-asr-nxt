@@ -27,10 +27,12 @@ augmentation: $(aug_dir)/aug_instructions.txt
 	cd $(aug_dir) && augmentation=true ./gen_and_augment.sh
 .PHONY: augmentation
 
+s3_from?=0
+s3_to?=5
 run/s3-list-augmentation: 
 	$(python_cmd) local/s3_list_augmentation.py --aug-dir $(aug_dir) \
-		--s3-bucket audio-corpus/crawl --s3-from 0 --s3-to 5 --s3-bucket-output audio-corpus/crawl-augmented \
-		--workers $(workers)
+		--s3-bucket audio-corpus/crawl --s3-from $(s3_from) --s3-to $(s3_to) --s3-bucket-output audio-corpus/crawl-augmented \
+		--workers $(workers) --tmp-dir /mnt/md1/tmp-augmentation
 .PHONY: augmentation
 ########################################################################################################
 clean:

@@ -161,17 +161,19 @@ def main(argv):
     parser.add_argument("--s3-to", nargs='?', required=False, default=999999, type=int, help="Index to end at")
     parser.add_argument("--workers", nargs='?', required=False, default=4, type=int, help="Augment workers count")
     parser.add_argument("--aug-dir", nargs='?', required=False, help="Dir of augmentation code folder")
+    parser.add_argument("--tmp-dir", nargs='?', required=False, help="Temporary dir of downloaded files")
 
     args = parser.parse_args(args=argv)
 
     logger.info(f"S3          : {args.s3_bucket} to {args.s3_bucket_output} from {args.s3_from} to {args.s3_to}")
     logger.info(f"Aug workers : {args.workers}")
-    logger.info(f"Aug dir : {args.aug_dir}")
+    logger.info(f"Aug dir     : {args.aug_dir}")
+    logger.info(f"Tmp dir     : {args.tmp_dir}")
 
     aug_gen = AugmentInfo(args.aug_dir)
-    logger.info(f"Rir : {len(aug_gen.rirs)}")
-    logger.info(f"Rir delays : {len(aug_gen.rir_delays)}")
-    logger.info(f"Noises : {aug_gen.noises}")
+    logger.info(f"Rir          : {len(aug_gen.rirs)}")
+    logger.info(f"Rir delays   : {len(aug_gen.rir_delays)}")
+    logger.info(f"Noises       : {aug_gen.noises}")
     logger.info(f"Compressions : {aug_gen.compressions}")
 
     s3_dwn = S3AudioLoader(args.s3_bucket, args.s3_bucket_output)
@@ -184,13 +186,17 @@ def main(argv):
     save_queue = JoinableQueue(maxsize=10)
 
     p_loader = Process(target=loader,
-                       args=(load_queue, augment_queue, error_queue, manager_queue, s3_dwn, aug_gen.generate))
+                       args=(load_queue, augment_queue, error_queue, manager_queue, s3_dwn, aug_gen.generate, args.tmp_dir))
     p_loader.start()
+
     p_manager = Process(target=manager, args=(manager_queue, save_queue, error_queue))
     p_manager.start()
 
-    p_saver = Process(target=saver, args=(save_queue, error_queue, s3_upl))
-    p_saver.start()
+    w_saver = []
+    for i in range(4):
+        p_saver = Process(target=saver, args=(save_queue, error_queue, s3_upl))
+        p_saver.start()
+        w_saver.append(p_saver)
 
     for i in range(args.workers):
         p = Process(target=augmenter, args=(augment_queue, manager_queue, error_queue, args.aug_dir + "/run_one.sh", i))
@@ -212,8 +218,11 @@ def main(argv):
     logger.info("waiting for manager to finish")
     p_manager.join()
     logger.info("waiting for saver to finish")
-    save_queue.put(None)
-    p_saver.join()
+
+    for _ in w_saver:
+        save_queue.put(None)
+    for p_saver in w_saver:
+        p_saver.join()
 
     logger.info("waiting to finish")
 
@@ -243,7 +252,7 @@ class AudioReader:
         return self.data, self.sr
 
 
-def loader(load_queue, augment_queue, error_queue, manager_queue, file_loader: S3AudioLoader, augment_info):
+def loader(load_queue, augment_queue, error_queue, manager_queue, file_loader: S3AudioLoader, augment_info, tmp_dir):
     logger.info("Worker started")
 
     is_error = False
@@ -261,10 +270,10 @@ def loader(load_queue, augment_queue, error_queue, manager_queue, file_loader: S
             logger.warning(f"Worker skipping due to previous error {tar_name}")
             load_queue.task_done()
             continue
-        logger.info(f"Processing id {_id}")
+        logger.info(f"Got load id {_id}")
         try:
             logger.info(f"got task {tar_name}")
-            out_dir = f".tmp/{_id:06d}"
+            out_dir = f"{tmp_dir}/{_id:06d}"
             extract_dir = f"{out_dir}"
             os.makedirs(extract_dir, exist_ok=True)
 
@@ -326,12 +335,31 @@ def saver(save_queue, error_queue, s3: S3AudioLoader):
             tar_buffer = io.BytesIO()
             with tarfile.open(fileobj=tar_buffer, mode="w:") as tar:
                 for f in msg.augmented:
-                    tar.add(f, arcname=os.path.relpath(f, msg.dir))
+                    f = Path(f)
+                    # read wav
+                    data, sr = sf.read(f)
+
+                    # write to flac in memory
+                    buf = io.BytesIO()
+                    sf.write(buf, data, sr, format="FLAC")
+                    buf.seek(0)
+
+                    # change name to .flac
+                    arcname = os.path.relpath(f, msg.dir)
+                    arcname = str(Path(arcname).with_suffix(".flac"))
+
+                    # add to tar
+                    info = tarfile.TarInfo(name=arcname)
+                    info.size = buf.getbuffer().nbytes
+                    info.mtime = int(time.time())
+
+                    tar.addfile(info, fileobj=buf)
+
             tar_buffer.seek(0)
             s3.write(msg.name, tar_buffer)
-            logger.info(f"Saved {msg.name} to S3")
+            logger.debug(f"Saved {msg.name} to S3")
 
-            logger.info(f"Cleaning up {msg.dir}")
+            logger.debug(f"Cleaning up {msg.dir}")
             shutil.rmtree(msg.dir)
 
         except Exception as e:
@@ -356,11 +384,11 @@ def manager(manager_queue, save_queue, error_queue):
         (msg) = manager_queue.get()
         try:
             if msg is None:
-                logger.info("Worker exiting")
+                logger.info("Worker manager exiting")
                 break
 
             if is_error:
-                logger.warning(f"Worker skipping due to previous error")
+                logger.warning(f"Worker manager skipping due to previous error")
                 continue
 
             if msg.type == "tar":
@@ -381,7 +409,6 @@ def manager(manager_queue, save_queue, error_queue):
 
         finally:
             manager_queue.task_done()
-        logger.info(f"Processing id {msg.type}")
 
 
 def augmenter(augment_queue, manager_queue, error_queue, cmd, wrk_id):
@@ -405,14 +432,14 @@ def augmenter(augment_queue, manager_queue, error_queue, cmd, wrk_id):
                 continue
             cmd_array = [cmd, Path(msg.file).absolute(), msg.rir, str(msg.rir_delay), msg.noise, str(msg.noise_a),
                          msg.comp, str(msg.comp_a), Path(msg.out).absolute(), str(wrk_id)]
-            logger.info(f"Run {cmd_array}")
+            logger.debug(f"Run {cmd_array}")
             subprocess.run(
                 cmd_array,
                 cwd=p_dir,
                 check=True
             )
 
-            logger.info(f"Finished augmenting file {msg.file}, saving as {msg.out}")
+            logger.debug(f"Finished augmenting file {msg.file}, saving as {msg.out}")
             manager_queue.put(Msg(type="file_done", tar=msg.tar, value=msg.out))
 
         except Exception as e:

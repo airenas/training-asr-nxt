@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 wav_path=$1
 rir_path=$2
@@ -65,5 +66,5 @@ if [ "$comp_alg" != "none" ]; then
 fi
 
 mv "$wav_in" "$dst_f"
-rm tmp$id.wav tmpo$id.wav clean$id.raw mixed$id.raw in$id.list out$id.list
+rm -f tmp$id.wav tmpo$id.wav clean$id.raw mixed$id.raw in$id.list out$id.list
 exit 0
