@@ -334,7 +334,7 @@ def saver(save_queue, error_queue, s3: S3AudioLoader):
 
             tar_buffer = io.BytesIO()
             with tarfile.open(fileobj=tar_buffer, mode="w:") as tar:
-                for f in msg.augmented:
+                for f in tqdm(msg.augmented, desc=f"Saving {msg.name} to tar"):
                     f = Path(f)
                     # read wav
                     data, sr = sf.read(f)
