@@ -75,11 +75,11 @@ class S3AudioLoader:
         start = time.perf_counter()
         bucket, key = self.bucket.split("/", 1)
         name = f"{key}/{name}"
-        logger.info(f"Loading {name}")
+        logger.debug(f"Loading {name}")
         res = io.BytesIO()
         self.s3_client.download_fileobj(bucket, name, res)
         elapsed = time.perf_counter() - start
-        logger.info(f"Loaded {name} from S3 in {elapsed:.2f} seconds")
+        logger.debug(f"Loaded {name} from S3 in {elapsed:.2f} seconds")
         res.seek(0)
         return res
 
@@ -270,28 +270,28 @@ def loader(load_queue, augment_queue, error_queue, manager_queue, file_loader: S
             logger.warning(f"Worker skipping due to previous error {tar_name}")
             load_queue.task_done()
             continue
-        logger.info(f"Got load id {_id}")
+        logger.debug(f"Got load id {_id}")
         try:
-            logger.info(f"got task {tar_name}")
+            logger.debug(f"got task {tar_name}")
             out_dir = f"{tmp_dir}/{_id:06d}"
             extract_dir = f"{out_dir}"
             os.makedirs(extract_dir, exist_ok=True)
 
             tar_buffer = file_loader.load(tar_name)
-            logger.info(f"Loaded {tar_name} from S3, extracting")
+            logger.debug(f"Loaded {tar_name} from S3, extracting")
             files = []
             with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
                 for member in tar.getmembers():
                     if member.isfile() and member.name.endswith(".wav"):
                         # Know the name
                         wav_name = member.name
-                        logger.info(f"Processing: {wav_name}")
+                        logger.debug(f"Processing: {wav_name}")
                         local_path = os.path.join(extract_dir, member.name)
                         os.makedirs(Path(local_path).parent, exist_ok=True)
                         with tar.extractfile(member) as src, open(local_path, "wb") as out:
                             shutil.copyfileobj(src, out)
                         files.append(local_path)
-                        logger.info(f"Extracted to: {local_path}")
+                        logger.debug(f"Extracted to: {local_path}")
             logger.debug(f"Saved {tar_name}")
             manager_queue.put(Msg(type="tar", tar=tar_name, value=out_dir))
             for f in files:
@@ -330,11 +330,12 @@ def saver(save_queue, error_queue, s3: S3AudioLoader):
                 logger.warning(f"Worker skipping due to previous error")
                 continue
 
-            logger.info(f"got save task {msg.name}, dir {msg.dir} files: {len(msg.augmented)}")
+            logger.debug(f"got save task {msg.name}, dir {msg.dir} files: {len(msg.augmented)}")
 
             tar_buffer = io.BytesIO()
             with tarfile.open(fileobj=tar_buffer, mode="w:") as tar:
-                for f in tqdm(msg.augmented, desc=f"Saving {msg.name} to tar"):
+                # for f in tqdm(msg.augmented, desc=f"Saving {msg.name} to tar"):
+                for f in msg.augmented:
                     f = Path(f)
                     # read wav
                     data, sr = sf.read(f)
@@ -399,7 +400,7 @@ def manager(manager_queue, save_queue, error_queue):
                 st = state[msg.tar]
                 st.augmented.append(msg.value)
                 if len(st.orig) * 3 == len(st.augmented):
-                    logger.info(f"All files ({len(st.orig)}:{len(st.augmented)}) done for {msg.tar}, saving tar")
+                    logger.debug(f"All files ({len(st.orig)}:{len(st.augmented)}) done for {msg.tar}, saving tar")
                     save_queue.put(st)
                     del state[msg.tar]
         except Exception as e:
