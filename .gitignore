@@ -182,3 +182,4 @@ egs/id_lang/tmp
 **/.runner.**
 **/.data/**
 .backup/
+aug-rir-noise/**
