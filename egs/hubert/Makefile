@@ -16,12 +16,14 @@ tsv01_dir?=$(l_output_dir)/tsv-01
 tsv02_dir?=$(l_output_dir)/tsv-02
 base01_model_01=$(l_output_dir)/base/e01/checkpoints/checkpoint_569_25000.pt
 layer01?=6
-base02_model_01=$(l_output_dir)/base/e02/checkpoints/checkpoint_last.pt
+base02_model_01=$(l_output_dir)/base/e02/checkpoints/checkpoint_1137_50000.pt
 layer02?=9
 ############################################################
-$(l_output_dir) $(l_output_dir)/base/km00 $(l_output_dir)/base/labels00 \
+$(l_output_dir) $(tsv01_dir) $(tsv02_dir) \
+	$(l_output_dir)/base/km00 $(l_output_dir)/base/labels00 \
 	$(l_output_dir)/base/km01 $(l_output_dir)/base/labels01 \
-	$(tsv01_dir) $(tsv02_dir):
+	$(l_output_dir)/large/km $(l_output_dir)/large/labels \
+	:
 	mkdir -p $@
 ############################################################
 info:
@@ -145,7 +147,7 @@ $(l_output_dir)/base/km00/train: $(tsv01_dir)/train.tsv | $(l_output_dir)/base/k
 ############################################################
 valid00_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels00.valid.$(r).done)
 $(l_output_dir)/.labels00.valid.%.done: $(tsv01_dir)/valid.tsv $(l_output_dir)/base/km00/train | $(l_output_dir)/base/labels00
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
 		$(l_output_dir)/base/feat00 valid \
 		$(l_output_dir)/base/km00/train \
 		$(n_shards) $* \
@@ -153,7 +155,7 @@ $(l_output_dir)/.labels00.valid.%.done: $(tsv01_dir)/valid.tsv $(l_output_dir)/b
 	touch $@
 train00_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels00.train.$(r).done)
 $(l_output_dir)/.labels00.train.%.done:  $(tsv01_dir)/train.tsv $(l_output_dir)/base/km00/train | $(l_output_dir)/base/labels00
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
 		$(l_output_dir)/base/feat00 train \
 		$(l_output_dir)/base/km00/train \
 		$(n_shards) $* \
@@ -189,7 +191,8 @@ $(l_output_dir)/.trained.01: prepare/base/00
 	--config-dir fairseq/examples/hubert/config/pretrain \
 	--config-name hubert_base_librispeech \
 	task.data=$(CURDIR)/$(tsv01_dir) task.label_dir=$(CURDIR)/$(l_output_dir)/base/labels00 task.labels='["km"]' model.label_rate=100 \
-	hydra.run.dir=$(CURDIR)/$(l_output_dir)/base/e01
+	hydra.run.dir=$(CURDIR)/$(l_output_dir)/base/e01 \
+	optimization.max_update=250000
 	touch $@
 train/base/01: $(l_output_dir)/.trained.01
 .PHONY: train/base/01
@@ -216,7 +219,7 @@ $(l_output_dir)/.feat01.train.%.done: $(tsv01_dir)/train.tsv
 prepare/features/01: $(features01_valid_done_files) $(features01_train_done_files)
 .PHONY: prepare/features/01
 ############################################################
-$(l_output_dir)/base/km01/train: $(features01_train_done_files)
+$(l_output_dir)/base/km01/train: $(features01_train_done_files) | $(l_output_dir)/base/km01
 	$(python_cmd) fairseq/examples/hubert/simple_kmeans/learn_kmeans.py $(l_output_dir)/base/feat01 train $(n_shards) $(l_output_dir)/base/km01/train $(n_clusters_01) --percent 0.1
 ############################################################
 ############################################################
@@ -224,14 +227,14 @@ valid01_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels01.valid.$(r)
 train01_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels01.train.$(r).done)
 
 $(l_output_dir)/.labels01.valid.%.done: $(tsv01_dir)/valid.tsv $(l_output_dir)/base/km01/train | $(l_output_dir)/base/labels01
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
 		$(l_output_dir)/base/feat01 valid \
 		$(l_output_dir)/base/km01/train \
 		$(n_shards) $* \
 		$(l_output_dir)/base/labels01
 	touch $@
 $(l_output_dir)/.labels01.train.%.done: $(tsv01_dir)/train.tsv $(l_output_dir)/base/km01/train | $(l_output_dir)/base/labels01
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
 		$(l_output_dir)/base/feat01 train \
 		$(l_output_dir)/base/km01/train \
 		$(n_shards) $* \
@@ -270,6 +273,7 @@ $(l_output_dir)/.trained.02: prepare/base/01
 	--config-name hubert_base_librispeech \
 	task.data=$(CURDIR)/$(tsv01_dir) task.label_dir=$(CURDIR)/$(l_output_dir)/base/labels01 task.labels='["km"]' model.label_rate=50 \
 	hydra.run.dir=$(CURDIR)/$(l_output_dir)/base/e02
+# 	optimization.max_update=400000 # default
 	touch $@
 train/base/02: $(l_output_dir)/.trained.02
 .PHONY: train/base/02
@@ -279,78 +283,80 @@ train/base/02: $(l_output_dir)/.trained.02
 ### LARGE model 
 ### iteration 1 (3)
 ############################################################
-features02_valid_done_files := $(foreach r,$(shards),$(l_output_dir)/.feat02.valid.$(r).done)
-features02_train_done_files := $(foreach r,$(shards),$(l_output_dir)/.feat02.train.$(r).done)
+features_large_valid_done_files := $(foreach r,$(shards),$(l_output_dir)/.feat.large.valid.$(r).done)
+features_large_train_done_files := $(foreach r,$(shards),$(l_output_dir)/.feat.large.train.$(r).done)
 
-$(l_output_dir)/.feat02.valid.%.done: $(tsv02_dir)/valid.tsv
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_hubert_feature.py .data/tsv valid ${base02_model_01} ${layer02} $(n_shards) $* \
-		$(l_output_dir)/large/feat02
+$(l_output_dir)/.feat.large.valid.%.done: $(tsv02_dir)/valid.tsv
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_hubert_feature.py $(tsv02_dir) valid ${base02_model_01} ${layer02} $(n_shards) $* \
+		$(l_output_dir)/large/feat
 	touch $@
-$(l_output_dir)/.feat02.train.%.done: $(tsv02_dir)/train.tsv
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_hubert_feature.py .data/tsv train ${base02_model_01} ${layer02} $(n_shards) $* \
-		$(l_output_dir)/large/feat02
+$(l_output_dir)/.feat.large.train.%.done: $(tsv02_dir)/train.tsv
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_hubert_feature.py $(tsv02_dir) train ${base02_model_01} ${layer02} $(n_shards) $* \
+		$(l_output_dir)/large/feat
 	touch $@
-prepare/features/02: $(features02_valid_done_files) $(features02_train_done_files)
-.PHONY: prepare/features/02
+prepare/features/large: $(features_large_valid_done_files) $(features_large_train_done_files)
+.PHONY: prepare/features/large
 ############################################################
-$(l_output_dir)/large/km02/train: $(features02_train_done_files)
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/learn_kmeans.py $(l_output_dir)/large/feat02 train $(n_shards) $(l_output_dir)/large/km02/train $(n_clusters_01) --percent 0.1
-prepare/km/02: $(l_output_dir)/large/km02/train
-.PHONY: prepare/km/02
+$(l_output_dir)/large/km/train: $(features_large_train_done_files) | $(l_output_dir)/large/km
+	$(python_cmd) fairseq/examples/hubert/simple_kmeans/learn_kmeans.py $(l_output_dir)/large/feat train $(n_shards) $(l_output_dir)/large/km/train $(n_clusters_01) --percent 0.1
+prepare/km/large: $(l_output_dir)/large/km/train
+.PHONY: prepare/km/large
 ############################################################
 ############################################################
-valid02_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels02.valid.$(r).done)
-$(l_output_dir)/.labels02.valid.%.done: $(tsv02_dir)/valid.tsv $(l_output_dir)/large/km02/train | $(l_output_dir)/large/labels02
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
-		$(l_output_dir)/large/feat02 valid \
-		$(l_output_dir)/large/km02/train \
+valid_large_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels.large.valid.$(r).done)
+train_large_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels.large.train.$(r).done)
+$(l_output_dir)/.labels.large.valid.%.done: $(tsv02_dir)/valid.tsv $(l_output_dir)/large/km/train | $(l_output_dir)/large/labels
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
+		$(l_output_dir)/large/feat valid \
+		$(l_output_dir)/large/km/train \
 		$(n_shards) $* \
-		$(l_output_dir)/large/labels02
+		$(l_output_dir)/large/labels
 	touch $@
-train02_done_files := $(foreach r,$(shards),$(l_output_dir)/.labels02.train.$(r).done)
-$(l_output_dir)/.labels02.train.%.done: $(tsv02_dir)/train.tsv $(l_output_dir)/large/km02/train | $(l_output_dir)/large/labels02
-	$(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
-		$(l_output_dir)/large/feat02 train \
-		$(l_output_dir)/large/km02/train \
+$(l_output_dir)/.labels.large.train.%.done: $(tsv02_dir)/train.tsv $(l_output_dir)/large/km/train | $(l_output_dir)/large/labels
+	CUDA_VISIBLE_DEVICES=$(gpu_for_$*) $(python_cmd) fairseq/examples/hubert/simple_kmeans/dump_km_label.py \
+		$(l_output_dir)/large/feat train \
+		$(l_output_dir)/large/km/train \
 		$(n_shards) $* \
-		$(l_output_dir)/large/labels02
+		$(l_output_dir)/large/labels
 	touch $@	
-prepare/labels/02: $(valid02_done_files) $(train02_done_files)
-.PHONY: prepare/labels/02
-$(l_output_dir)/.merge02.valid: $(valid02_done_files) | $(l_output_dir)/large/labels02
+prepare/labels/large: $(valid_large_done_files) $(train_large_done_files)
+.PHONY: prepare/labels/large
+$(l_output_dir)/.merge.large.valid: $(valid_large_done_files) | $(l_output_dir)/large/labels
 	$(python_cmd) local/merge_km.py \
 		--split valid \
 		--n-shards $(n_shards) \
-		--base-dir $(l_output_dir)/large/labels02 
+		--base-dir $(l_output_dir)/large/labels 
 	touch $@
-$(l_output_dir)/.merge02.train: $(train02_done_files) | $(l_output_dir)/large/labels02
+$(l_output_dir)/.merge.large.train: $(train_large_done_files) | $(l_output_dir)/large/labels
 	$(python_cmd) local/merge_km.py \
 		--split train \
 		--n-shards $(n_shards) \
-		--base-dir $(l_output_dir)/large/labels02
+		--base-dir $(l_output_dir)/large/labels
 	touch $@
-$(l_output_dir)/large/labels02/dict.km.txt: | $(l_output_dir)/large/labels02
+$(l_output_dir)/large/labels/dict.km.txt: | $(l_output_dir)/large/labels
 	$(python_cmd) local/dummy_dict.py --n $(n_clusters_01) --output $@_
 	mv $@_ $@
 ############################################################
-$(l_output_dir)/.prepared.02: prepare/features/02 prepare/km/02 prepare/labels/02 $(l_output_dir)/.merge02.train $(l_output_dir)/.merge02.valid $(l_output_dir)/large/labels02/dict.km.txt
+$(l_output_dir)/.prepared.large: prepare/features/large prepare/km/large prepare/labels/large $(l_output_dir)/.merge.large.train $(l_output_dir)/.merge.large.valid $(l_output_dir)/large/labels/dict.km.txt
 	touch $@
-prepare/base/02: $(l_output_dir)/.prepared.02
-.PHONY: prepare/base/02
+prepare/large: $(l_output_dir)/.prepared.large
+.PHONY: prepare/large
 ############################################################
 ############################################################
 ## train LARGE for 400k updates
 ## Third iteration
+## tune dataset.max_tokens=500000 for gpu OOM
 ############################################################
-$(l_output_dir)/.trained.03: prepare/base/02
+$(l_output_dir)/.trained.large: prepare/large
 	torchrun --nproc_per_node=3 fairseq/fairseq_cli/hydra_train.py \
 	--config-dir fairseq/examples/hubert/config/pretrain \
-	--config-name hubert_large_librispeech \
-	task.data=$(CURDIR)/$(l_output_dir)/tsv task.label_dir=$(CURDIR)/$(l_output_dir)/large/labels02 task.labels='["km"]' model.label_rate=50 \
-	hydra.run.dir=$(CURDIR)/$(l_output_dir)/large/e03
+	--config-name hubert_large_librivox \
+	task.data=$(CURDIR)/$(tsv02_dir) task.label_dir=$(CURDIR)/$(l_output_dir)/large/labels task.labels='["km"]' model.label_rate=50 \
+	hydra.run.dir=$(CURDIR)/$(l_output_dir)/large/e01 \
+	dataset.max_tokens=250000
 	touch $@
-train/large/03: $(l_output_dir)/.trained.03
-.PHONY: train/large/03
+train/large: $(l_output_dir)/.trained.large
+.PHONY: train/large
 ############################################################
 clean:
 	@echo -n "Are you sure you want to delete $(l_output_dir)/...? [y/N] " && read ans && [ $${ans:-N} = y ]
