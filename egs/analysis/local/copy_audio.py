@@ -207,7 +207,7 @@ def main(argv):
               bar_format="{l_bar}{bar}| "
                          "{n:.2f}/{total:.2f} {unit} "
                          "[{elapsed}<{remaining}, {rate_fmt}]") as pbar:
-        for chunk in build_tar(build_chunks(files, args.audio_seconds), 30):
+        for chunk in build_tar(build_chunks(files, args.audio_seconds), 600):
             if not error_queue.empty():
                 logger.error("Error in worker, stopping main process")
                 break
@@ -282,7 +282,7 @@ def worker(work_queue, args, file_writer, error_queue):
             tar_buffer = BytesIO()
             with tarfile.open(fileobj=tar_buffer, mode="w:") as tar:
                 for chunk in tar_chunk.items:
-                    output_file = f"{chunk.source}/{chunk.index:06d}.wav"
+                    output_file = f"{chunk.source}/{tar_chunk.index:06d}/{chunk.index:06d}.wav"
                     parts = []
                     for fc in chunk.items:
                         a_path = Path(fc.path)

@@ -93,7 +93,7 @@ $(l_output_dir)/file.cuts.jsonl: $(l_output_dir)/final.segments.jsonl
 calc/file-cuts: $(l_output_dir)/file.cuts.jsonl
 .PHONY: calc/file-cuts
 ############################################################
-audio_seconds?=600
+audio_seconds?=30
 audio_output_dir?=./.data/audio
 audio_output_bucket?=
 $(l_output_dir)/.files.done: $(l_output_dir)/file.cuts.jsonl
