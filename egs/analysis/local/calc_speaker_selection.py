@@ -35,6 +35,25 @@ def duration_aug(param, source):
     return param
 
 
+def skip_shorter_than(segments, secs):
+    res = []
+    for s in segments:
+        if s.end - s.start >= secs:
+            res.append(s)
+    return res
+
+
+def split_by_duration(segments):
+    best, other = [], []
+    for s in segments:
+        dur = s.end - s.start
+        if dur <= 30:
+            best.append(s)
+        else:
+            other.append(s)
+    return best, other
+
+
 def main(argv):
     logger.info("Starting")
     parser = argparse.ArgumentParser(description="Prepares speaker selection for final training data")
@@ -88,12 +107,15 @@ def main(argv):
 
     with open(args.output, "w", encoding="utf-8") as output_f:
         for gs, segments in tqdm(items.items()):
+            segments = skip_shorter_than(segments=segments, secs=0.2)
             segments = skip_less_than_in_file(segments=segments, secs=3)
-            random.shuffle(segments)
+            best, other = split_by_duration(segments)
+            random.shuffle(best)
+            random.shuffle(other)
             duration = 0.0
             duration_crawl = 0.0
             selected = []
-            for seg in segments:
+            for seg in best:
                 dur = seg.end - seg.start
                 if seg.source == "crawl":
                     if seg.gender == "m" and duration_crawl + dur > args.take_up_crawl_male:
@@ -108,6 +130,23 @@ def main(argv):
                 else:
                     if duration + 30 > args.take_up:  # almost full, can leave now
                         break
+            ## try the same with others
+            for seg in other:
+                dur = seg.end - seg.start
+                if seg.source == "crawl":
+                    if seg.gender == "m" and duration_crawl + dur > args.take_up_crawl_male:
+                        continue
+                    if seg.gender == "f" and duration_crawl + dur > args.take_up_crawl_female:
+                        continue
+                if duration + dur <= args.take_up:
+                    selected.append(seg)
+                    duration += dur
+                    if seg.source == "crawl":
+                        duration_crawl += dur
+                else:
+                    if duration + 30 > args.take_up:  # almost full, can leave now
+                        break
+
             for seg in selected:
                 key = (seg.source, seg.gender)
                 stats[key]["duration"] += seg.end - seg.start

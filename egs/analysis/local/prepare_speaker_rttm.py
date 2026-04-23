@@ -14,8 +14,9 @@ from preparation.logger import logger
 from preparation.utils.sm_segments import parse_segments, SegmentLabel
 
 MIN_SEC_IN_FILE = 3
-MIN_SEGMENT = 0.1
+MIN_SEGMENT = 0.2
 MAX_SILENCE = 0.3
+MAX_WANTED_SEGMENT = 30.0 # for one speaker
 
 MUSIC = SegmentLabel.MUSIC.value
 
@@ -131,6 +132,9 @@ def join_same(seg: List[Segment]) -> List[Segment]:
         if len(res) > 0:
             prev = res[-1]
         if not prev:
+            res.append(s)
+            continue
+        if s.end - prev.start > MAX_WANTED_SEGMENT:
             res.append(s)
             continue
         if s.speaker == prev.speaker and s.start - prev.end < MAX_SILENCE:
