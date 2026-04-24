@@ -180,8 +180,8 @@ def main(argv):
     s3_upl = S3AudioLoader(args.s3_bucket, args.s3_bucket_output)
     workers = []
     load_queue = JoinableQueue(maxsize=10)
-    manager_queue = JoinableQueue(maxsize=100)
-    augment_queue = JoinableQueue(maxsize=100)
+    manager_queue = JoinableQueue(maxsize=1000)
+    augment_queue = JoinableQueue(maxsize=1000)
     error_queue = Queue(maxsize=args.workers + 3)
     save_queue = JoinableQueue(maxsize=10)
 
