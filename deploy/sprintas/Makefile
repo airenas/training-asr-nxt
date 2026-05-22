@@ -22,4 +22,8 @@ copy/viet-asr:
 	$(RSYNC_CMD) -r ./remote_vietasr/*  $(user)@$(server):~/VietASR
 	$(RSYNC_CMD) -r $(icefall_asr_dir)/egs/liepa3/ASR/local/ $(user)@$(server):~/icefall/egs/liepa3/ASR/local
 .PHONY: copy/viet-asr
+
+copy/vu-hpc:
+	$(RSYNC_CMD) -r ./remote_vu_hpc/*  $(user)@$(server):~/vu_hpc/
+.PHONY: copy/vu-hpc
 #########################################################################
