@@ -183,3 +183,4 @@ egs/id_lang/tmp
 **/.data/**
 .backup/
 aug-rir-noise/**
+deploy/vu_hpc/docker/icefall_*.sif

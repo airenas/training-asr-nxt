@@ -2,6 +2,8 @@
 SSH_CMD=ssh -p $(port) -t $(user)@$(server)
 RSYNC_CMD=rsync -e "ssh -p $(port)" -avz
 viet_asr_dir=../../../VietASR
+icefall_asr_dir=../../../icefall
+
 #########################################################################
 ssh:
 	ssh -p $(port) $(user)@$(server)
@@ -18,5 +20,6 @@ copy/scripts:
 copy/viet-asr:
 	$(RSYNC_CMD) -r $(viet_asr_dir)/ $(user)@$(server):~/VietASR/
 	$(RSYNC_CMD) -r ./remote_vietasr/*  $(user)@$(server):~/VietASR
+	$(RSYNC_CMD) -r $(icefall_asr_dir)/egs/liepa3/ASR/local/ $(user)@$(server):~/icefall/egs/liepa3/ASR/local
 .PHONY: copy/viet-asr
 #########################################################################
