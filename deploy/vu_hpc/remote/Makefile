@@ -5,10 +5,10 @@ container?=containers/icefall_vu_hpc-0.1.sif
 gpus?=4
 cpus?=16
 mem?=64G
-time?=24:00:00
 # gpu, gpu2
 machine?=gpu
-time?=24:00:00
+time?=72:00:00
+max_durations?=800
 work_dir?=~/train-asr/VietASR
 ###########################################################################
 info: jobs/queue
@@ -21,6 +21,8 @@ info: jobs/queue
 	@echo "container: $(container)"
 	@echo "allocation: $(allocation)"
 	@echo "work_dir: $(work_dir)"
+	@echo "max_durations: $(max_durations)"
+
 .PHONY: info	
 ###########################################################################
 jobs/info:
@@ -45,8 +47,6 @@ run/gpu/info:
 run/cpu/info:
 	@echo "CPU info for job $(job_id):"
 	@echo "Warning terminal is broken afer this command"
-	@Pause for 5 seconds to read the output...
-	sleep 5
 	srun --jobid=$(job_id) --overlap --export ALL $$SHELL -c 'htop'	
 .PHONY: run/cpu/info
 
@@ -58,7 +58,7 @@ run/train:
 		--time=$(time) \
 		--chdir=$(work_dir) \
 		--job-name=train_$(gpus)gpu \
-		--wrap="singularity exec --nv $(container) make gpus=$(gpus) train max_durations=8000"
+		--wrap="singularity exec --nv $(container) make gpus=$(gpus) train max_durations=$(max_durations)"
 ###########################################################################
 job/describe: 
 	scontrol show job $(job_id)

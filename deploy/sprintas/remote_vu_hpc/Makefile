@@ -18,3 +18,6 @@ copy/fbank:
 	$(RSYNC_CMD) $(data_dir)/fbank $(user)@$(server):~/train-asr/experiments/VietASR/
 .PHONY: copy/fbank
 
+copy/fbank-fixed:
+	$(RSYNC_CMD) $(data_dir)/fbank-fixed $(user)@$(server):~/train-asr/experiments/VietASR/
+.PHONY: copy/fbank-fixed
