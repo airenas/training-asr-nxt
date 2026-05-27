@@ -4,12 +4,12 @@ allocation?=
 container?=containers/icefall_vu_hpc-0.1.sif
 gpus?=4
 cpus?=16
-mem?=64G
+mem?=128G
 # gpu, gpu2
 machine?=gpu
 time?=72:00:00
-max_durations?=800
 work_dir?=~/train-asr/VietASR
+start_epoch?=3
 ###########################################################################
 info: jobs/queue
 	@echo "------------------------------------------"
@@ -21,7 +21,7 @@ info: jobs/queue
 	@echo "container: $(container)"
 	@echo "allocation: $(allocation)"
 	@echo "work_dir: $(work_dir)"
-	@echo "max_durations: $(max_durations)"
+	@echo "max_duration: $(max_duration)"
 
 .PHONY: info	
 ###########################################################################
@@ -58,7 +58,7 @@ run/train:
 		--time=$(time) \
 		--chdir=$(work_dir) \
 		--job-name=train_$(gpus)gpu \
-		--wrap="singularity exec --nv $(container) make gpus=$(gpus) train max_durations=$(max_durations)"
+		--wrap="singularity exec --nv $(container) make gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch)"
 ###########################################################################
 job/describe: 
 	scontrol show job $(job_id)

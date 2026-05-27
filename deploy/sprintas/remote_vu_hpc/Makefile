@@ -21,3 +21,11 @@ copy/fbank:
 copy/fbank-fixed:
 	$(RSYNC_CMD) $(data_dir)/fbank-fixed $(user)@$(server):~/train-asr/experiments/VietASR/
 .PHONY: copy/fbank-fixed
+
+download/tensorboard:
+	$(RSYNC_CMD) $(user)@$(server):~/train-asr/experiments/VietASR/exp/v01/tensorboard ./
+.PHONY: download/tensorboard
+
+download/exp:
+	$(RSYNC_CMD) $(user)@$(server):~/train-asr/experiments/VietASR/exp $(data_dir)
+.PHONY: download/exp
