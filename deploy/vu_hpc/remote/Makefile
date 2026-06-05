@@ -22,6 +22,8 @@ info: jobs/queue
 	@echo "allocation: $(allocation)"
 	@echo "work_dir: $(work_dir)"
 	@echo "max_duration: $(max_duration)"
+	@echo "start_epoch: $(start_epoch)"
+	@echo "end_epoch: $(end_epoch)"
 
 .PHONY: info	
 ###########################################################################
@@ -58,7 +60,26 @@ run/train:
 		--time=$(time) \
 		--chdir=$(work_dir) \
 		--job-name=train_$(gpus)gpu \
-		--wrap="singularity exec --nv $(container) make gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch)"
+		--wrap="singularity exec --nv $(container) make gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch) epoch_train=$(end_epoch)"
+run/train/rt:
+	sbatch $(allocation) -p $(machine) \
+		--gres gpu:$(gpus) \
+		--cpus-per-task=$(cpus) \
+		--mem=$(mem) \
+		--time=$(time) \
+		--chdir=$(work_dir) \
+		--job-name=train_rt_$(gpus)gpu \
+		--wrap="singularity exec --nv $(container) make cfg=Makefile.options_rt gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch) epoch_train=$(end_epoch)"
+## rt small model
+run/train/rts:
+	sbatch $(allocation) -p $(machine) \
+		--gres gpu:$(gpus) \
+		--cpus-per-task=$(cpus) \
+		--mem=$(mem) \
+		--time=$(time) \
+		--chdir=$(work_dir) \
+		--job-name=train_rts_$(gpus)gpu \
+		--wrap="singularity exec --nv $(container) make cfg=Makefile.options_rts gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch) epoch_train=$(end_epoch)"				
 ###########################################################################
 job/describe: 
 	scontrol show job $(job_id)

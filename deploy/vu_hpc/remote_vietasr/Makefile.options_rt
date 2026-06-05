@@ -1,0 +1,22 @@
+AWS_PROFILE=default
+corpus_dir?=/scratch/lustre/home/hpc_airenas/train-asr/corpus/LIEPA3
+common_voice_download_dir?=/scratch/lustre/home/hpc_airenas/train-asr/corpus
+#limit_count?=10000
+gpus?=8
+## increase if gpu mem allows
+max_duration?=600
+seconds_train_kmeans?=360000
+epoch_train?=10
+avg?=10
+data_dir?=/scratch/lustre/home/hpc_airenas/train-asr/experiments/VietASR
+exp_dir?=/scratch/lustre/home/hpc_airenas/train-asr/experiments/VietASR/exp/v01rt
+pretrain_exp_dir?=/scratch/lustre/home/hpc_airenas/train-asr/experiments/VietASR/exp/pretrain_v01
+finetune_exp_dir?=/scratch/lustre/home/hpc_airenas/train-asr/experiments/VietASR/exp/finetune_v01
+epoch_pretrain?=100
+train_fbank_dir?=/scratch/lustre/home/hpc_airenas/train-asr/experiments/VietASR/fbank-fixed
+icefall_dir?=/workspace/icefall/
+model_params?=--num-encoder-layers 2,2,4,5,4,2 \
+		--feedforward-dim 768,1536,2048,3072,2048,1536 \
+		--encoder-dim 256,512,768,1024,768,512 \
+		--encoder-unmasked-dim 256,256,256,320,256,256 \
+		--use-ctc 1 --use-transducer 1 --causal 1
