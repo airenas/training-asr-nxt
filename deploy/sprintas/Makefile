@@ -3,6 +3,7 @@ SSH_CMD=ssh -p $(port) -t $(user)@$(server)
 RSYNC_CMD=rsync -e "ssh -p $(port)" -avz
 viet_asr_dir=../../../VietASR
 icefall_asr_dir=../../../icefall
+punct_dir=../../../Edge-Punct-Casing
 
 #########################################################################
 ssh:
@@ -26,4 +27,9 @@ copy/viet-asr:
 copy/vu-hpc:
 	$(RSYNC_CMD) -r ./remote_vu_hpc/*  $(user)@$(server):~/vu_hpc/
 .PHONY: copy/vu-hpc
+
+copy/punct:
+	$(RSYNC_CMD) -r --exclude data --exclude corpus --exclude __pycache__ $(punct_dir)/ $(user)@$(server):~/Edge-Punct-Casing/
+	$(RSYNC_CMD) -r ./remote_punct/*  $(user)@$(server):~/Edge-Punct-Casing/egs/lt_ai_blkt/
+.PHONY: copy/punct
 #########################################################################
