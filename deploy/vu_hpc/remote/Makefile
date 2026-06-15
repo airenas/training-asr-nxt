@@ -79,7 +79,18 @@ run/train/rts:
 		--time=$(time) \
 		--chdir=$(work_dir) \
 		--job-name=train_rts_$(gpus)gpu \
-		--wrap="singularity exec --nv $(container) make cfg=Makefile.options_rts gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch) epoch_train=$(end_epoch)"				
+		--wrap="singularity exec --nv $(container) make cfg=Makefile.options_rts gpus=$(gpus) train max_duration=$(max_duration) start_epoch=$(start_epoch) epoch_train=$(end_epoch)"
+###########################################################################
+run/pretrain:
+	sbatch run_ssl.sh 
+# 	sbatch $(allocation) -p $(machine) \
+# 		--gres gpu:$(gpus) \
+# 		--cpus-per-task=$(cpus) \
+# 		--mem=$(mem) \
+# 		--time=$(time) \
+# 		--chdir=$(work_dir) \
+# 		--job-name=ssl_$(gpus)gpu \
+# 		--wrap="singularity exec --nv $(container) make gpus=$(gpus) pretrain max_duration=$(max_duration) start_epoch=$(start_epoch) epoch_train=$(end_epoch)"						
 ###########################################################################
 job/describe: 
 	scontrol show job $(job_id)
