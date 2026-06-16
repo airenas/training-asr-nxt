@@ -24,6 +24,11 @@ copy/viet-asr:
 	$(RSYNC_CMD) -r $(icefall_asr_dir)/egs/liepa3/ASR/local/ $(user)@$(server):~/icefall/egs/liepa3/ASR/local
 .PHONY: copy/viet-asr
 
+copy/icefall:
+	$(RSYNC_CMD) -r $(icefall_asr_dir)/egs/liepa3/ASR/local/ $(user)@$(server):~/icefall/egs/liepa3/ASR/local
+	$(RSYNC_CMD) -r --exclude Makefile.options --exclude __pycache__ $(icefall_asr_dir)/egs/cc-100/ $(user)@$(server):~/icefall/egs/cc-100
+.PHONY: copy/icefall
+
 copy/vu-hpc:
 	$(RSYNC_CMD) -r ./remote_vu_hpc/*  $(user)@$(server):~/vu_hpc/
 .PHONY: copy/vu-hpc
