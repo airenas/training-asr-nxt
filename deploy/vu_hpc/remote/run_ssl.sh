@@ -5,9 +5,9 @@
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=7
 #SBATCH --gres=gpu:7
-#SBATCH --cpus-per-task=5
-#SBATCH --mem=32G
-#SBATCH --time=240:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=96G
+#SBATCH --time=300:00:00
 #SBATCH --chdir=/scratch/lustre/home/hpc_airenas/train-asr/VietASR
 
 export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
@@ -28,4 +28,4 @@ echo "LOCAL_RANK=$LOCAL_RANK"
 
 srun singularity exec --nv \
   /scratch/lustre/home/hpc_airenas/train-asr/containers/icefall_vu_hpc-0.1.sif \
-  make gpus=$WORLD_SIZE pretrain multi_node=1 max_duration=1000 start_epoch=1 epoch_train=10
+  make gpus=$WORLD_SIZE pretrain multi_node=1 max_duration=1000 start_epoch=1 epoch_train=20
